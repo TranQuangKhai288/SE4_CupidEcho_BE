@@ -29,5 +29,5 @@ relationshipSchema.index(
   { unique: true }
 );
 
-const Interaction = mongoose.model("Relationship", relationshipSchema);
-export default Interaction;
+const Relationship = mongoose.model("Relationship", relationshipSchema);
+export default Relationship;

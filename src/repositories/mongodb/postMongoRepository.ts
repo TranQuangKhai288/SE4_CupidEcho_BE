@@ -1,9 +1,8 @@
 import { IPostRepository } from "../interfaces";
 import {
   IPostDocument,
-  ICreatePost,
+  // ICreatePost,
   IPost,
-  ICreateMedia,
 } from "../../interfaces/post.interface";
 import { Post, Media } from "../../models";
 
@@ -132,7 +131,7 @@ export class PostMongoRepository implements IPostRepository {
       return err.message;
     }
   }
-  async create(post: ICreatePost): Promise<IPostDocument> {
+  async create(post: IPostDocument): Promise<IPostDocument> {
     try {
       const createdPost = await Post.create(post);
       // tạo media nếu có
@@ -140,7 +139,7 @@ export class PostMongoRepository implements IPostRepository {
         //gán postId cho media
 
         await Promise.all(
-          post.media.map(async (media) => {
+          post.media.map(async (media: any) => {
             media.postId = createdPost._id.toString();
             await Media.create(media);
           })

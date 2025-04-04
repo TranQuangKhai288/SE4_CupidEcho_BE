@@ -1,35 +1,182 @@
-import mongoose, { Schema } from "mongoose";
+import mongoose, { Schema, Document } from "mongoose";
+import {
+  IPostDocument,
+  ICommentDocument,
+  IMediaDocument,
+} from "../interfaces/post.interface";
 
-const mediaSchema = new Schema({
-  postId: { type: Schema.Types.ObjectId, ref: "Post", required: true }, // Tham chiếu đến bài viết mà phương tiện đó thuộc về
-  type: { type: String, enum: ["image", "video", "audio"] }, // Loại của phương tiện: hình ảnh hoặc video
-  URL: { type: String }, // URL hoặc đường dẫn đến phương tiện
-});
-
-const commentSchema = new Schema({
-  userId: { type: Schema.Types.ObjectId, ref: "User", required: true }, // Tham chiếu đến người dùng bình luận
-  postId: { type: Schema.Types.ObjectId, ref: "Post", required: true }, // Tham chiếu đến bài viết mà bình luận đó thuộc về
-  content: { type: String, required: true }, // Nội dung của bình luận
-  media: [{ type: Schema.Types.ObjectId, ref: "Media" }], // Mảng chứa các hình ảnh và video
-  createdAt: { type: Date, default: Date.now }, // Thời gian tạo bình luận
-});
-
-// Định nghĩa schema cho bài viết
-const postSchema = new Schema(
+// Schema cho Media
+const mediaSchema = new Schema<IMediaDocument>(
   {
-    userId: { type: Schema.Types.ObjectId, ref: "User", required: true }, // Tham chiếu đến người dùng đăng bài
-    content: { type: String, required: true }, // Nội dung của bài viết
-    postedAt: { type: Date, default: Date.now }, // Thời gian người dùng đăng bài
-    likes: [{ type: Schema.Types.ObjectId, ref: "User" }],
+    postId: {
+      type: Schema.Types.ObjectId,
+      ref: "Post",
+      required: true,
+    },
+    type: {
+      type: String,
+      enum: ["image", "video", "audio"],
+      required: true,
+    },
+    URL: {
+      type: String,
+      required: true,
+      match: /^(https?:\/\/[^\s]+)/, // Kiểm tra định dạng URL
+    },
+    fileSize: { type: Number },
+    duration: { type: Number },
   },
   {
-    timestamps: true, // Tự động tạo các trường createdAt và updatedAt
+    timestamps: true,
+    toObject: {
+      transform: (doc, ret) => {
+        ret.postId = ret.postId.toString();
+        return ret;
+      },
+    },
+    toJSON: {
+      transform: (doc, ret) => {
+        ret.postId = ret.postId.toString();
+        return ret;
+      },
+    },
   }
 );
 
-// Đăng ký model với mongoose
-export const Post = mongoose.model("Post", postSchema);
-// Đăng ký model với mongoose
-export const Comment = mongoose.model("Comment", commentSchema);
-// Đăng ký model với mongoose
-export const Media = mongoose.model("Media", mediaSchema);
+// Schema cho Comment
+const commentSchema = new Schema<ICommentDocument>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    postId: {
+      type: Schema.Types.ObjectId,
+      ref: "Post",
+      required: true,
+    },
+    content: {
+      type: String,
+      required: true,
+      maxlength: 500, // Giới hạn độ dài bình luận
+    },
+    media: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Media",
+        default: [],
+      },
+    ],
+    parentId: {
+      type: Schema.Types.ObjectId,
+      ref: "Comment",
+      default: null, // Hỗ trợ nested comments
+    },
+  },
+  {
+    timestamps: true,
+    toObject: {
+      transform: (doc, ret) => {
+        ret.userId = ret.userId.toString();
+        ret.postId = ret.postId.toString();
+        if (ret.media) {
+          ret.media = ret.media.map((id: mongoose.Types.ObjectId) =>
+            id.toString()
+          );
+        }
+        ret.parentId = ret.parentId ? ret.parentId.toString() : null;
+        return ret;
+      },
+    },
+    toJSON: {
+      transform: (doc, ret) => {
+        ret.userId = ret.userId.toString();
+        ret.postId = ret.postId.toString();
+        if (ret.media) {
+          ret.media = ret.media.map((id: mongoose.Types.ObjectId) =>
+            id.toString()
+          );
+        }
+        ret.parentId = ret.parentId ? ret.parentId.toString() : null;
+        return ret;
+      },
+    },
+  }
+);
+
+// Schema cho Post
+const postSchema = new Schema<IPostDocument>(
+  {
+    userId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+    content: {
+      type: String,
+      required: true,
+    },
+    media: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Media",
+        default: [],
+      },
+    ],
+    likes: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+        default: [],
+      },
+    ],
+  },
+  {
+    timestamps: true,
+    toObject: {
+      transform: (doc, ret) => {
+        ret.userId = ret.userId.toString();
+        if (ret.media) {
+          ret.media = ret.media.map((id: mongoose.Types.ObjectId) =>
+            id.toString()
+          );
+        }
+        if (ret.likes) {
+          ret.likes = ret.likes.map((id: mongoose.Types.ObjectId) =>
+            id.toString()
+          );
+        }
+        return ret;
+      },
+    },
+    toJSON: {
+      transform: (doc, ret) => {
+        ret.userId = ret.userId.toString();
+        if (ret.media) {
+          ret.media = ret.media.map((id: mongoose.Types.ObjectId) =>
+            id.toString()
+          );
+        }
+        if (ret.likes) {
+          ret.likes = ret.likes.map((id: mongoose.Types.ObjectId) =>
+            id.toString()
+          );
+        }
+        return ret;
+      },
+    },
+  }
+);
+
+// Thêm index để tối ưu hóa truy vấn
+mediaSchema.index({ postId: 1 });
+commentSchema.index({ postId: 1, createdAt: -1 });
+postSchema.index({ userId: 1, createdAt: -1 });
+
+// Đăng ký models
+const Media = mongoose.model<IMediaDocument>("Media", mediaSchema);
+const Comment = mongoose.model<ICommentDocument>("Comment", commentSchema);
+const Post = mongoose.model<IPostDocument>("Post", postSchema);
+
+export { Media, Comment, Post };

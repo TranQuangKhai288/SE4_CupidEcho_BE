@@ -1,7 +1,7 @@
 import { IRelationship } from "../interfaces/relationship.interface";
 import { IRelationshipRepository } from "../repositories/interfaces";
 
-class InteractionService {
+class RelationshipService {
   constructor(private relationshipRepository: IRelationshipRepository) {}
 
   async createRelationshipRequest(
@@ -133,4 +133,4 @@ class InteractionService {
   }
 }
 
-export default InteractionService;
+export default RelationshipService;

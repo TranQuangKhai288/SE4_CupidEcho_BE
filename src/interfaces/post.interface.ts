@@ -1,51 +1,60 @@
-import { Document, ObjectId } from "mongoose";
+import { ObjectId } from "mongoose";
 
-export interface IPost {
-  _id: string;
-  userId: string;
-  content: string;
-  postedAt?: Date;
-  media: IMediaDocument[];
-  likes: string[];
-}
-
+// Interface cho Media
 export interface IMedia {
-  _id: string;
-  postId: string;
-  type: string;
-  URL: string;
+  postId: string; // ID của bài viết liên kết
+  type: "image" | "video" | "audio"; // Loại phương tiện
+  URL: string; // Đường dẫn đến tệp
+  fileSize?: number; // Kích thước tệp (byte)
+  duration?: number; // Thời lượng (cho video/audio)
 }
 
+// Interface cho Media trong MongoDB (sử dụng ObjectId)
+export interface IMediaDocument extends Omit<IMedia, "postId"> {
+  postId: ObjectId;
+}
+
+// Interface cho CreateMedia
+export interface ICreateMedia {
+  type: "image" | "video" | "audio"; // Loại phương tiện
+  URL: string; // Đường dẫn đến tệp
+  fileSize?: number; // Kích thước tệp (byte)
+  duration?: number; // Thời lượng (cho video/audio)
+}
+
+// Interface cho Comment
 export interface IComment {
-  _id: string;
-  userId: string;
-  postId: string;
-  content: string;
-  media: string[];
-  createdAt: Date;
+  userId: string; // ID của người dùng bình luận
+  postId: string; // ID của bài viết liên kết
+  content: string; // Nội dung bình luận
+  media?: string[]; // Danh sách ID của media liên kết
+  parentId?: string | null; // ID của bình luận cha (cho nested comments)
+  createdAt: Date; // Thời gian tạo
 }
 
-export interface ICreatePost extends Omit<IPost, "_id" | "likes" | "media"> {
-  media: ICreateMedia[];
-}
-export interface ICreateMedia extends Omit<IMedia, "_id"> {}
-export interface ICreateComment extends Omit<IComment, "_id"> {}
-
-export interface IPostDocument extends Omit<IPost, "_id" | "userId" | "likes"> {
-  _id: ObjectId;
-  userId: ObjectId;
-  likes: ObjectId[];
-}
-
-export interface IMediaDocument extends Omit<IMedia, "_id" | "postId"> {
-  _id: ObjectId;
-  postId: ObjectId;
-}
-
+// Interface cho Comment trong MongoDB (sử dụng ObjectId)
 export interface ICommentDocument
-  extends Omit<IComment, "_id" | "userId" | "postId" | "media"> {
-  _id: ObjectId;
+  extends Omit<IComment, "userId" | "postId" | "media" | "parentId"> {
   userId: ObjectId;
   postId: ObjectId;
-  media: ObjectId[];
+  media: ObjectId[]; // Tham chiếu đến Media
+  parentId: ObjectId | null; // Tham chiếu đến Comment cha
+}
+
+// Interface cho Post
+export interface IPost {
+  userId: string; // ID của người dùng đăng bài
+  content: string; // Nội dung bài viết
+  media?: string[]; // Danh sách ID của media liên kết
+  likes: string[]; // Danh sách ID của người dùng thích bài viết
+  createdAt: Date; // Thời gian tạo
+  updatedAt: Date; // Thời gian cập nhật
+}
+
+// Interface cho Post trong MongoDB (sử dụng ObjectId)
+export interface IPostDocument
+  extends Omit<IPost, "userId" | "media" | "likes"> {
+  userId: ObjectId;
+  media: ObjectId[]; // Tham chiếu đến Media
+  likes: ObjectId[]; // Tham chiếu đến User
 }
