@@ -11,7 +11,7 @@ const getMessagesInConversation = async (
   try {
     const { page = 1, limit = 10 } = req.query;
     const userId = req.user?._id;
-    const convId = req.params.convId;
+    const convId = req.params.id;
 
     const response = await messageService.getMessagesInConversation(
       convId,

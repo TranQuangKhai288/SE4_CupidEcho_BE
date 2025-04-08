@@ -4,7 +4,7 @@ export interface IConversation extends Document {
   participants: string[]; // Chuẩn hóa thành string[]
   createdAt: Date; // Không optional vì timestamps: true
   updatedAt: Date; // Không optional vì timestamps: true
-  lastMessage?: string; // Chuẩn hóa thành string
+  lastMessage?: ObjectId; // Chuẩn hóa thành string
 }
 
 export interface IMessage extends Document {

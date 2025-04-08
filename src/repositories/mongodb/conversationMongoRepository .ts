@@ -38,6 +38,7 @@ export class ConversationMongoRepository implements IConversationRepository {
     console.log(page, limit, search);
 
     const conversations = await Conversation.aggregate([
+      // Lookup participants
       {
         $lookup: {
           from: "users",
@@ -46,14 +47,40 @@ export class ConversationMongoRepository implements IConversationRepository {
           as: "participantsData",
         },
       },
+      // Lookup lastMessage và populate senderId
       {
         $lookup: {
           from: "messages",
           localField: "lastMessage",
           foreignField: "_id",
           as: "lastMessageData",
+          pipeline: [
+            {
+              $lookup: {
+                from: "users",
+                localField: "senderId",
+                foreignField: "_id",
+                as: "senderData",
+              },
+            },
+            {
+              $unwind: {
+                path: "$senderData",
+                preserveNullAndEmptyArrays: true, // Giữ lại nếu không có senderData
+              },
+            },
+            {
+              $project: {
+                _id: 1,
+                content: 1,
+                createdAt: 1,
+                senderId: "$senderData", // Gán thông tin sender vào senderId
+              },
+            },
+          ],
         },
       },
+      // Match với userId và search
       {
         $match: {
           participants: { $in: [new mongoose.Types.ObjectId(userId)] },
@@ -61,14 +88,10 @@ export class ConversationMongoRepository implements IConversationRepository {
             ? {
                 $or: [
                   {
-                    participantsData: {
-                      $elemMatch: { name: { $regex: search, $options: "i" } },
-                    },
+                    "participantsData.name": { $regex: search, $options: "i" },
                   },
                   {
-                    participantsData: {
-                      $elemMatch: { email: { $regex: search, $options: "i" } },
-                    },
+                    "participantsData.email": { $regex: search, $options: "i" },
                   },
                   {
                     "lastMessageData.content": {
@@ -81,17 +104,19 @@ export class ConversationMongoRepository implements IConversationRepository {
             : {}),
         },
       },
-
+      // Project dữ liệu cần thiết
       {
         $project: {
           _id: 1,
-          participants: "$participantsData", // Trả về toàn bộ thông tin user          lastMessage: 1,
-          lastMessage: { $arrayElemAt: ["$lastMessageData", 0] }, // Lấy phần tử đầu tiên của mảng lastMessage
+          participants: "$participantsData",
+          lastMessage: { $arrayElemAt: ["$lastMessageData", 0] },
         },
       },
+      // Phân trang (nếu cần)
+      { $skip: (page - 1) * limit },
+      { $limit: limit },
     ]);
 
-    // console.log(conversations[0].participants);
     // Xử lý dữ liệu trả về
     const result = conversations.map((conv) => {
       const populatedConv = {
@@ -103,16 +128,19 @@ export class ConversationMongoRepository implements IConversationRepository {
             _id: participant._id.toString(),
             name: participant.name,
             avatar: participant.avatar,
-          })),
+          }))[0],
         lastMessage: conv.lastMessage
           ? {
               _id: conv.lastMessage._id.toString(),
               content: conv.lastMessage.content,
               createdAt: conv.lastMessage.createdAt,
+              sender: {
+                _id: conv.lastMessage.senderId._id.toString(),
+                name: conv.lastMessage.senderId.name,
+                // avatar: conv.lastMessage.senderId.avatar,
+              },
             }
           : null,
-        createdAt: conv.createdAt,
-        updatedAt: conv.updatedAt,
       };
       return populatedConv as IConversation;
     });

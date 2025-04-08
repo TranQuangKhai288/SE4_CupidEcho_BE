@@ -4,6 +4,7 @@ import {
   authMiddlewareAdmin,
   authMiddlewareAuthentication,
 } from "../middlewares/index";
+import { MessageController } from "../controllers";
 
 const router = express.Router();
 
@@ -21,12 +22,19 @@ router
   .route("/:id")
   .get(
     authMiddlewareAuthentication,
-    ConversationController.getConversationDetails
+    MessageController.getMessagesInConversation
   )
   .put(authMiddlewareAuthentication, ConversationController.updateConversation)
   .delete(
     authMiddlewareAuthentication,
     ConversationController.deleteConversation
   );
+
+// router
+//   .route("/:convId")
+//   .get(
+//     authMiddlewareAuthentication,
+//     MessageController.getMessagesInConversation
+//   );
 
 export default router;

@@ -43,9 +43,10 @@ export class MessageMongoRepository implements IMessageRepository {
       .limit(limit);
 
     return {
-      messages: messages.map(
-        (message) => message.toObject() as unknown as IMessage
-      ),
+      messages: messages
+        .map((message) => message.toObject() as unknown as IMessage)
+        .reverse(), // Đảo ngược mảng tại backend
+
       pagination: { page, limit },
     };
   }
