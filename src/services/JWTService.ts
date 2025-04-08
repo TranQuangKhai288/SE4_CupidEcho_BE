@@ -33,35 +33,40 @@ export const genneralRefreshToken = async (payload: any) => {
   return refresh_token;
 };
 
-// const refreshTokenJwtService = (token: string) => {
-//   return new Promise((resolve, reject) => {
-//     try {
-//       if (!process.env.REFRESH_TOKEN) {
-//         throw new Error("REFRESH_TOKEN is not defined in environment variables");
-//       }
-//       jwt.verify(
-//         token,
-//         process.env.REFRESH_TOKEN as string,
-//         async (err: jwt.VerifyErrors | null, decoded: any) => {
-//           if (err) {
-//             resolve({
-//               status: "ERR",
-//               message: err.message,
-//             });
-//           }
-//           const access_token = await genneralAccessToken({
-//             id: user?.,
-//             isAdmin: user?.isAdmin,
-//           });
-//           resolve({
-//             status: "OK",
-//             message: "SUCESS",
-//             access_token,
-//           });
-//         }
-//       );
-//     } catch (e) {
-//       reject(e);
-//     }
-//   });
-// };
+// Hàm để làm mới access token
+export const refreshAccessToken = async (refreshToken: string) => {
+  try {
+    // Kiểm tra nếu REFRESH_TOKEN không được định nghĩa
+    if (!process.env.REFRESH_TOKEN) {
+      throw new Error("REFRESH_TOKEN is not defined in environment variables");
+    }
+
+    // Xác minh refresh token
+    const decoded = jwt.verify(refreshToken, process.env.REFRESH_TOKEN) as any;
+
+    // Loại bỏ các thuộc tính không cần thiết (iat và exp) khỏi payload
+    const { exp, iat, ...cleanedPayload } = decoded;
+
+    // Tạo access token mới với payload đã làm sạch
+    if (!process.env.ACCESS_TOKEN) {
+      throw new Error("ACCESS_TOKEN is not defined in environment variables");
+    }
+
+    const newAccessToken = jwt.sign(
+      cleanedPayload, // Chỉ giữ lại các trường cần thiết như id, isAdmin
+      process.env.ACCESS_TOKEN,
+      { expiresIn: "1d" } // Thời hạn của access token mới
+    );
+
+    // Trả về access token, refresh token và payload đã làm sạch
+    return {
+      accessToken: newAccessToken,
+      refreshToken, // Trả về refresh token cũ nếu cần thiết
+      payload: cleanedPayload, // Payload đã làm sạch
+    };
+
+    // return newAccessToken;
+  } catch (error) {
+    throw new Error("Invalid or expired refresh token");
+  }
+};

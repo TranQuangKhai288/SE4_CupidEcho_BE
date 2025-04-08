@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { userServices } from "../services";
 import { IUser } from "../interfaces/user.interface";
 import { IApiResponse } from "../interfaces/response.interface";
+import { refreshAccessToken } from "../services/JWTService";
 
 const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -160,10 +161,49 @@ const getRecommendUsers = async (
   }
 };
 
+const refreshToken = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      res.status(400).json({
+        status: "ERR",
+        message: "Refresh token is required",
+      } as IApiResponse<null>);
+      return;
+    }
+
+    const newAccessToken = await refreshAccessToken(refreshToken);
+    if (!newAccessToken) {
+      res.status(401).json({
+        status: "ERR",
+        message: "Invalid refresh token",
+      } as IApiResponse<null>);
+      return;
+    }
+    res.status(200).json({
+      status: "OK",
+      message: "Refresh token successfully",
+      data: {
+        access_token: newAccessToken.accessToken,
+        refresh_token: newAccessToken.refreshToken,
+        payload: newAccessToken.payload,
+      },
+    } as IApiResponse<{ access_token: string; refresh_token: string; payload: any }>);
+    return;
+  } catch (error) {
+    console.log(error, "Error when refreshing token");
+    res.status(500).json({
+      status: "ERR",
+      message: "An error occurred while refreshing token",
+    } as IApiResponse<null>);
+  }
+};
+
 export default {
   updateUser,
   deleteUser,
   getDetailsUser,
   getUsers,
   getRecommendUsers,
+  refreshToken,
 };

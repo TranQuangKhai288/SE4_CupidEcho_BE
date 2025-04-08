@@ -20,7 +20,7 @@ router.get(
 router.post("/register", auth.createUser);
 router.post("/login", auth.loginUser);
 // router.post("/log-out", UserController.logoutUser);
-// router.post("/refresh-token", UserController.refreshToken);
+router.post("/refresh-token", UserController.refreshToken);
 router.post("/forgot-password", UserController.updateUser);
 // router.get("/verify-email", auth.verifyEmail);
 
