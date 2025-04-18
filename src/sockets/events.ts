@@ -6,6 +6,7 @@ import {
 } from "../repositories/mongodb";
 import Redis from "../config/redis";
 import FirebaseAdmin from "../config/firebaseAdmin";
+import { conversationService } from "../services";
 
 const messageService = new MessageService(
   messageMongoRepository,
@@ -26,6 +27,7 @@ export const setupConvEvents = (socket: Socket) => {
         const userId = socket.handshake.auth.userId;
         const { convId, content } = data;
         console.log(data, "data");
+        console.log(userId, "userId");
 
         if (!userId || !convId || !content) {
           const errorResponse = {
@@ -81,6 +83,7 @@ export const setupConvEvents = (socket: Socket) => {
             console.log(
               `Người dùng ${participantId} đang online (socketId: ${socketId})`
             );
+            socket.to(socketId).emit("newMessage", response);
             console.log("Gửi tin nhắn real-time...");
           } else {
             console.log(`Người dùng ${participantId} đang offline`);
@@ -117,6 +120,69 @@ export const setupConvEvents = (socket: Socket) => {
         const errorResponse = {
           status: "ERR",
           message: "Lỗi khi gửi tin nhắn",
+        };
+        socket.emit("errorMessage", errorResponse);
+        if (typeof callback === "function") callback(errorResponse);
+      }
+    }
+  );
+
+  socket.on(
+    "exitSign",
+    async (
+      data: { convId: string; partnerId: string },
+      callback?: (response: any) => void
+    ) => {
+      try {
+        const userId = socket.handshake.auth.userId;
+        const { convId, partnerId } = data;
+
+        if (!userId || !convId) {
+          const errorResponse = {
+            status: "ERR",
+            message: "Thiếu thông tin cần thiết (userId, convId)",
+          };
+          socket.emit("errorMessage", errorResponse);
+          if (typeof callback === "function") callback(errorResponse);
+          return;
+        }
+
+        // Xóa doan chat
+        const response = await conversationService.deleteConversation(
+          convId,
+          userId
+        );
+        console.log(response, "response deleteConversation");
+        if (typeof response === "string" || !response) {
+          // const errorResponse = {
+          //   status: "ERR",
+          //   message: "Lỗi khi thoát cuộc trò chuyện",
+          // };
+          // socket.emit("errorMessage", errorResponse);
+          // if (typeof callback === "function") callback(errorResponse);
+          return;
+        }
+        // lấy socketId của người dùng
+        const redis = await Redis.getInstance();
+        const redisClient = redis.getClient();
+        const socketId = await redisClient.get(`socket:${partnerId}`);
+        console.log();
+        if (socketId) {
+          socket.to(socketId).emit("exitSignal", convId);
+        } else {
+          console.error("Socket ID is null, cannot emit 'exitSign'");
+        }
+        const successResponse = {
+          status: "OK",
+          message: "Đã thoát khỏi cuộc trò chuyện",
+          data: response,
+        };
+        if (typeof callback === "function") callback(successResponse);
+      } catch (error) {
+        console.error("Lỗi khi thoát cuộc trò chuyện:", error);
+        const errorResponse = {
+          status: "ERR",
+          message: "Lỗi khi thoát cuộc trò chuyện",
         };
         socket.emit("errorMessage", errorResponse);
         if (typeof callback === "function") callback(errorResponse);

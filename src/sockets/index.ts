@@ -31,12 +31,12 @@ export const setupSocketEvents = (io: Server) => {
       1,
       10000 // Lấy tất cả cuộc trò chuyện
     );
-    for (const conv of result.conversations as { _id: string }[]) {
-      const convId = conv._id.toString();
-      await redisSub.subscribe(convId, (message) => {
-        socket.emit("newMessage", JSON.parse(message));
-      });
-    }
+    // for (const conv of result.conversations as { _id: string }[]) {
+    //   const convId = conv._id.toString();
+    //   await redisSub.subscribe(convId, (message) => {
+    //     socket.emit("newMessage", JSON.parse(message));
+    //   });
+    // }
 
     // Thiết lập các sự kiện
     setupConvEvents(socket);

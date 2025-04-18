@@ -72,12 +72,18 @@ class ConversationService {
         return "Conversation not found";
       }
       // Check if the user is in the conversation
+
       if (
-        !conversation.participants.map((p) => p.toString()).includes(userId)
+        !conversation.participants
+          .map((p) => p.toString())
+          .includes(userId.toString())
       ) {
+        console.log(conversation.participants, "participants");
+        console.log(userId, "userId");
         return "User is not in the conversation";
       }
       await this.conRepository.delete(id);
+      return conversation;
     } catch (e) {
       console.error(e, "Lỗi khi xóa cuộc trò chuyện");
       throw new Error("Lỗi khi xóa cuộc trò chuyện");

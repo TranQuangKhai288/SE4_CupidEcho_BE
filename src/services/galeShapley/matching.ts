@@ -1,6 +1,8 @@
 import { Profile, UserCondition } from "../../models";
 import { runStableMatching } from "./matchingAlgorithm";
 import Redis from "../../config/redis"; // Giả sử đây là đường dẫn đến file Redis của bạn
+import { conversationService } from "../../services";
+import { IConversation } from "../../interfaces/conversation.interface";
 
 // Hàng đợi lưu người dùng và thời gian tham gia
 const matchingQueue = new Map<string, { joinTime: Date }>();
@@ -92,17 +94,23 @@ const processBatch = async (batch: string[], io: any) => {
       if (userId1 < userId2) {
         matchedUsers.add(userId1);
         matchedUsers.add(userId2);
+        const { conversationId } = await createMatchRecord(userId1, userId2);
 
-        io.to(userId1).emit("matching:matched", {
+        // lấy socketId từ Redis
+        const redis = await Redis.getInstance();
+        const client = redis.getClient();
+        const socketId1 = await client.get(`socket:${userId1}`);
+        const socketId2 = await client.get(`socket:${userId2}`);
+        io.to(socketId1).emit("matching:matched", {
           partnerId: userId2,
           timestamp: new Date(),
+          conversationId: conversationId,
         });
-        io.to(userId2).emit("matching:matched", {
+        io.to(socketId2).emit("matching:matched", {
           partnerId: userId1,
           timestamp: new Date(),
+          conversationId: conversationId,
         });
-
-        await createMatchRecord(userId1, userId2);
       }
     }
 
@@ -184,4 +192,13 @@ export const runMatchingProcess = async (io: any) => {
 // Hàm lưu kết quả ghép đôi
 const createMatchRecord = async (userId1: string, userId2: string) => {
   console.log(`Match record created for ${userId1} and ${userId2}`);
+  const participants = [userId1, userId2];
+  const conversationData: Partial<IConversation> = { participants };
+  const accessConv = await conversationService.accessConversation(
+    conversationData
+  );
+  if (typeof accessConv === "string") {
+    return { conversationId: accessConv };
+  }
+  return { conversationId: accessConv._id };
 };
