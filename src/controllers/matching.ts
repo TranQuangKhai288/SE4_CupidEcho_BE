@@ -25,7 +25,10 @@ export const startMatching = async (
 
     // io.to(userId).emit('matching:status', { status: 'searching' });
 
-    res.status(200).json({ message: "Đã bắt đầu tìm kiếm ghép đôi" });
+    res.status(200).json({
+      status: "OK",
+      message: "Đã bắt đầu tìm kiếm ghép đôi",
+    });
   } catch (error) {
     console.error("Error starting matching:", error);
     res.status(500).json({ message: "Đã xảy ra lỗi" });

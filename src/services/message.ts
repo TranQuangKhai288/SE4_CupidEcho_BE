@@ -42,8 +42,11 @@ class MessageService {
       );
       return result;
     } catch (e) {
-      console.log(e, "Lỗi khi lấy danh sách người dùng");
-      return "Lỗi khi lấy danh sách người dùng";
+      console.log(
+        e,
+        "Lỗi khi lấy danh sách tin nhắn getMessagesInConversation"
+      );
+      return "Lỗi khi lấy danh sách tin nhắn";
     }
   }
 

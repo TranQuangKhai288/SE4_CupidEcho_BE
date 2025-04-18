@@ -35,7 +35,7 @@ const getMessagesInConversation = async (
   } catch (error) {
     res.status(500).json({
       status: "ERR",
-      message: "Lỗi khi lấy danh sách người dùng",
+      message: "Lỗi khi lấy danh sách tin nhắn",
     } as IApiResponse<null>);
   }
 };

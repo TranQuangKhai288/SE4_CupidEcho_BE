@@ -9,6 +9,7 @@ import { Server } from "socket.io";
 import http from "http";
 import { setupSocketEvents } from "./sockets";
 import socketAuthMiddleware from "./middlewares/socketAuthMiddleware";
+import { runMatchingProcess } from "./services/galeShapley/matching";
 
 dotenv.config();
 
@@ -50,6 +51,16 @@ const startServices = async () => {
     process.exit(1);
   }
 };
+
+// Chạy thuật toán ghép đôi định kỳ
+setInterval(async () => {
+  try {
+    // Chạy thuật toán ghép đôi
+    await runMatchingProcess(io);
+  } catch (error) {
+    console.error("Error running matching process:", error);
+  }
+}, 1000 * 5); // Chạy mỗi 5 seconds
 
 // Graceful shutdown
 const shutdown = async () => {
