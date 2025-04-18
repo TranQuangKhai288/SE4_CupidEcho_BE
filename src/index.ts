@@ -69,6 +69,16 @@ startServices()
   .then(() => {
     server.listen(PORT, () => {
       console.log(`⚡ Server đang chạy tại http://localhost:${PORT}`);
+      //log ipV4 address của server
+      const interfaces = require("os").networkInterfaces();
+      for (const interfaceName in interfaces) {
+        const networkInterface = interfaces[interfaceName];
+        for (const addressInfo of networkInterface) {
+          if (addressInfo.family === "IPv4" && !addressInfo.internal) {
+            console.log(`IP Address: http://${addressInfo.address}:${PORT}`);
+          }
+        }
+      }
     });
   })
   .catch((err) => {
