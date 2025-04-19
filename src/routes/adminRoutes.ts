@@ -1,23 +1,20 @@
 import express from "express";
-import { UserController } from "../controllers";
+import { UserController, AdminController } from "../controllers";
 import { authMiddlewareAdmin } from "../middlewares/index";
 
 const router = express.Router();
 
 router
   .route("/matching/queue") // 	Xem danh sách người đang tìm ghép
-  .get(authMiddlewareAdmin, UserController.getUsers);
+  .get(authMiddlewareAdmin, AdminController.getMatchingQueue);
 
 router
-  .route("/matching/pair") // 	Xem danh sách cặp đã được ghép
-  .get(authMiddlewareAdmin, UserController.getDetailsUser);
+  .route("/matching/history") // 	Xem danh sách cặp đã được ghép
+  .get(authMiddlewareAdmin, AdminController.getMatchingHistory);
 
+router.route("/zodiac").get(authMiddlewareAdmin, AdminController.getZodiac); // 	Xem danh sách cung hoàng đạo
 router
-  .route("/matching/status") // 	Thống kê số người trong hàng đợi, số cặp ghép, v.v
-  .get(authMiddlewareAdmin, UserController.getDetailsUser);
-
-router
-  .route("/matching/algorithm") // 	Xóa toàn bộ hàng đợi ghép
-  .post(authMiddlewareAdmin, UserController.getUsers);
-
+  .route("/algorithm") // 	Xem thông số thuật toán ghép đôi
+  .get(authMiddlewareAdmin, AdminController.getAlgorithmConstant); // 	Xem thông số thuật toán ghép đôi
+// .post(authMiddlewareAdmin, AdminController.updateAlgorithmConstant); // 	Cập nhật thông số thuật toán ghép đôi
 export default router;

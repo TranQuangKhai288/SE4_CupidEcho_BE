@@ -1,17 +1,75 @@
+import mongoose from "mongoose";
 import { Profile, UserCondition } from "../../models";
 import { runStableMatching } from "./matchingAlgorithm";
-import Redis from "../../config/redis"; // Giả sử đây là đường dẫn đến file Redis của bạn
+import Redis from "../../config/redis";
 import { conversationService } from "../../services";
 import { IConversation } from "../../interfaces/conversation.interface";
+import Algorithm from "../../models/algorithm";
 
-// Hàng đợi lưu người dùng và thời gian tham gia
-const matchingQueue = new Map<string, { joinTime: Date }>();
-const processingBatches: Set<string>[] = [];
-let minUsers = 20; // Số lượng người tối thiểu ban đầu
-const maxWaitTime = 0.1 * 60 * 1000; // Thời gian chờ tối đa: 1 phút
-const userTimeout = 2 * 60 * 1000; // Timeout cá nhân: 2 phút
+interface AlgorithmConfig {
+  minUser: number;
+  maxWaitTime: number;
+  userTimeout: number;
+}
+const watchAlgorithmChanges = () => {
+  const changeStream = Algorithm.watch();
+  changeStream.on("change", async (change) => {
+    console.log("Cấu hình algorithm thay đổi:", change);
+    algorithmConfig = await getAlgorithmConfig();
+    console.log("Đã cập nhật algorithmConfig:", algorithmConfig);
+  });
+};
 
-// Khôi phục hàng đợi từ Redis khi khởi động
+const getAlgorithmConfig = async (): Promise<AlgorithmConfig> => {
+  try {
+    const config = await Algorithm.findOne({});
+    if (!config) {
+      console.warn(
+        "Không tìm thấy cấu hình algorithm, sử dụng giá trị mặc định."
+      );
+      return {
+        minUser: 20,
+        maxWaitTime: 6000,
+        userTimeout: 12000,
+      };
+    }
+    return {
+      minUser: config.minUser,
+      maxWaitTime: config.maxWaitTime,
+      userTimeout: config.userTimeout,
+    };
+  } catch (error) {
+    console.error("Lỗi khi lấy cấu hình algorithm:", error);
+    return {
+      minUser: 10,
+      maxWaitTime: 30000, //,ms
+      userTimeout: 12000,
+    };
+  }
+};
+
+let algorithmConfig: AlgorithmConfig = {
+  minUser: 0,
+  maxWaitTime: 6000,
+  userTimeout: 1000,
+};
+
+const initializeConfig = async () => {
+  algorithmConfig = await getAlgorithmConfig();
+  console.log("Đã tải cấu hình algorithm:", algorithmConfig);
+};
+
+initializeConfig()
+  .then(() => {
+    watchAlgorithmChanges();
+  })
+  .catch((error) => {
+    console.error("Lỗi khi khởi tạo cấu hình:", error);
+  });
+
+export const matchingQueue = new Map<string, { joinTime: Date }>();
+export const processingBatches: Set<string>[] = [];
+
 const restoreQueue = async () => {
   const redis = await Redis.getInstance();
   const client = redis.getClient();
@@ -44,7 +102,6 @@ export const startUserMatching = async (userId: string) => {
   if (!matchingQueue.has(userIdStr)) {
     const joinTime = new Date();
     matchingQueue.set(userIdStr, { joinTime });
-    // Lưu vào Redis
     const redis = await Redis.getInstance();
     const client = redis.getClient();
     await client.set(
@@ -67,7 +124,6 @@ export const stopUserMatching = async (userId: string, io?: any) => {
       JSON.stringify(Object.fromEntries(matchingQueue))
     );
 
-    // Thông báo người dùng nếu bị xóa do timeout
     if (io) {
       io.to(userIdStr).emit("matching:timeout", {
         message: "Đã hết thời gian chờ, vui lòng thử lại.",
@@ -80,7 +136,6 @@ export const stopUserMatching = async (userId: string, io?: any) => {
   }
 };
 
-// Hàm xử lý một lô người dùng
 const processBatch = async (batch: string[], io: any) => {
   try {
     const batchSet = new Set(batch);
@@ -96,7 +151,6 @@ const processBatch = async (batch: string[], io: any) => {
         matchedUsers.add(userId2);
         const { conversationId } = await createMatchRecord(userId1, userId2);
 
-        // lấy socketId từ Redis
         const redis = await Redis.getInstance();
         const client = redis.getClient();
         const socketId1 = await client.get(`socket:${userId1}`);
@@ -121,7 +175,7 @@ const processBatch = async (batch: string[], io: any) => {
 
     return batch.filter((userId) => !matchedUsers.has(userId));
   } catch (error) {
-    console.error(`Error processing batch: ${error}`);
+    console.error(`Lỗi khi xử lý lô: ${error}`);
     io.to(batch).emit("matching:error", {
       message: "Đã xảy ra lỗi khi ghép đôi, vui lòng thử lại sau.",
     });
@@ -129,18 +183,17 @@ const processBatch = async (batch: string[], io: any) => {
   }
 };
 
-// Chạy thuật toán ghép đôi định kỳ
 export const runMatchingProcess = async (io: any) => {
-  console.log(`Running matching process. Queue size: ${matchingQueue.size}`);
-
+  // console.log("Chạy quá trình ghép đôi...");
+  // console.log("Running matching process, Queue size:", matchingQueue.size);
+  // console.log("Algorithm Config:", algorithmConfig);
   if (matchingQueue.size < 2) {
     return;
   }
 
   const now = new Date();
-  // Kiểm tra timeout cá nhân
   for (const [userId, { joinTime }] of matchingQueue) {
-    if (now.getTime() - joinTime.getTime() > userTimeout) {
+    if (now.getTime() - joinTime.getTime() > algorithmConfig.userTimeout) {
       await stopUserMatching(userId, io);
     }
   }
@@ -150,16 +203,22 @@ export const runMatchingProcess = async (io: any) => {
     ? now.getTime() - oldestUser.joinTime.getTime()
     : 0;
 
-  if (timeWaited >= maxWaitTime) {
-    minUsers = Math.max(2, Math.floor(minUsers / 2));
-    console.log(`Reduced minUsers to ${minUsers} due to long wait time`);
+  if (timeWaited >= algorithmConfig.maxWaitTime) {
+    algorithmConfig.minUser = Math.max(
+      2,
+      Math.floor(algorithmConfig.minUser / 2)
+    );
+    console.log(
+      `Giảm minUser xuống ${algorithmConfig.minUser} do thời gian chờ lâu`
+    );
   }
 
-  if (matchingQueue.size >= minUsers) {
-    // Lấy lô người dùng (minUsers người đầu tiên)
-    const batch = Array.from(matchingQueue.keys()).slice(0, minUsers);
+  if (matchingQueue.size >= algorithmConfig.minUser) {
+    const batch = Array.from(matchingQueue.keys()).slice(
+      0,
+      algorithmConfig.minUser
+    );
     for (const userId of batch) {
-      // Xóa lô khỏi hàng đợi
       matchingQueue.delete(userId);
     }
     const redis = await Redis.getInstance();
@@ -168,7 +227,6 @@ export const runMatchingProcess = async (io: any) => {
       "matching_queue",
       JSON.stringify(Object.fromEntries(matchingQueue))
     );
-    // Chạy thuật toán ghép đôi cho lô này
 
     const unmatchedUsers = await processBatch(batch, io);
 
@@ -183,15 +241,14 @@ export const runMatchingProcess = async (io: any) => {
     );
 
     if (matchingQueue.size === 0) {
-      minUsers = 20;
-      console.log(`Reset minUsers to ${minUsers}`);
+      algorithmConfig.minUser = (await getAlgorithmConfig()).minUser;
+      console.log(`Đặt lại minUser về ${algorithmConfig.minUser}`);
     }
   }
 };
 
-// Hàm lưu kết quả ghép đôi
 const createMatchRecord = async (userId1: string, userId2: string) => {
-  console.log(`Match record created for ${userId1} and ${userId2}`);
+  console.log(`Tạo bản ghi ghép đôi cho ${userId1} và ${userId2}`);
   const participants = [userId1, userId2];
   const conversationData: Partial<IConversation> = { participants };
   const accessConv = await conversationService.accessConversation(

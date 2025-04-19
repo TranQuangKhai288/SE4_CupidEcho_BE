@@ -6,6 +6,7 @@ import RelationshipController from "./relationship";
 import ConversationController from "./conversation";
 import MessageController from "./message";
 import PostController from "./post";
+import AdminController from "./admin";
 
 export {
   UserController,
@@ -15,4 +16,5 @@ export {
   ConversationController,
   MessageController,
   PostController,
+  AdminController,
 };

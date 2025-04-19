@@ -10,6 +10,8 @@ import Relationship from "./relationship";
 import UserCondition from "./condition";
 import Conversation from "./conversation";
 import ZodiacCompatibility from "./zodiac";
+import Algorithm from "./algorithm";
+import MatchHistory from "./matchhistory";
 
 export {
   User,
@@ -24,4 +26,6 @@ export {
   UserCondition,
   Conversation,
   ZodiacCompatibility,
+  Algorithm,
+  MatchHistory,
 };

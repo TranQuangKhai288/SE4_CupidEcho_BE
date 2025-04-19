@@ -4,6 +4,7 @@ import RelationshipService from "./relationship";
 import ConversationService from "./conversation";
 import MessageService from "./message";
 import PostService from "./post";
+import AdminService from "./admin";
 import {
   ConditionMongoRepository,
   ProfileMongoRepository,
@@ -40,6 +41,7 @@ const messageService = new MessageService(
   conversationMongoRepository
 );
 
+const adminService = new AdminService();
 export {
   userServices,
   profileAndConditionServices,
@@ -47,4 +49,5 @@ export {
   postService,
   conversationService,
   messageService,
+  adminService,
 };
