@@ -5,6 +5,8 @@ import Redis from "../../config/redis";
 import { conversationService } from "../../services";
 import { IConversation } from "../../interfaces/conversation.interface";
 import Algorithm from "../../models/algorithm";
+import {MatchHistory} from "../../models";
+
 
 interface AlgorithmConfig {
   minUser: number;
@@ -251,11 +253,16 @@ const createMatchRecord = async (userId1: string, userId2: string) => {
   console.log(`Tạo bản ghi ghép đôi cho ${userId1} và ${userId2}`);
   const participants = [userId1, userId2];
   const conversationData: Partial<IConversation> = { participants };
-  const accessConv = await conversationService.accessConversation(
-    conversationData
-  );
-  if (typeof accessConv === "string") {
-    return { conversationId: accessConv };
-  }
-  return { conversationId: accessConv._id };
+  const accessConv = await conversationService.accessConversation(conversationData);
+  const conversationId = typeof accessConv === "string" ? accessConv : accessConv._id;
+
+  // Lưu vào MatchHistory
+  await MatchHistory.create({
+    userId1,
+    userId2,
+    conversationId,
+    timestamp: new Date(),
+  });
+
+  return { conversationId };
 };

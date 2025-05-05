@@ -3,6 +3,7 @@ import {
   IPostDocument,
   // ICreatePost,
   IPost,
+  ICreatePost,
 } from "../../interfaces/post.interface";
 import { Post, Media } from "../../models";
 
@@ -131,9 +132,14 @@ export class PostMongoRepository implements IPostRepository {
       return err.message;
     }
   }
-  async create(post: IPostDocument): Promise<IPostDocument> {
+  async create(post: ICreatePost): Promise<IPostDocument> {
     try {
-      const createdPost = await Post.create(post);
+      const createdPost = await Post.create({
+        //post create without media first
+        ...post,
+        media: undefined,
+      });
+      console.log("Created post here: ", createdPost);
       // tạo media nếu có
       if (post.media) {
         //gán postId cho media
@@ -148,7 +154,7 @@ export class PostMongoRepository implements IPostRepository {
 
       return createdPost as unknown as IPostDocument;
     } catch (err: any) {
-      console.log(err);
+      console.log("err when create post", err);
       return err.messsage;
     }
   }

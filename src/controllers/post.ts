@@ -25,7 +25,7 @@ const createPost = async (req: Request, res: Response): Promise<void> => {
       media
     );
     console.log("Response createPost: ", response);
-    if (typeof response === "string") {
+    if (typeof response === "string" || response === undefined) {
       res
         .status(400)
         .json({ status: "ERR", message: response } as IApiResponse<null>);
@@ -34,14 +34,14 @@ const createPost = async (req: Request, res: Response): Promise<void> => {
 
     res.status(200).json({
       status: "OK",
-      message: "Create message successfully",
+      message: "Create Post successfully",
       data: response,
     } as IApiResponse<IPost>);
-    console.log("Create message successfully");
+    console.log("Create Post successfully");
   } catch (error) {
     res.status(500).json({
       status: "ERR",
-      message: "Lỗi khi tạo tin nhắn",
+      message: "Lỗi khi tạo Post",
     } as IApiResponse<null>);
   }
 };

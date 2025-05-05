@@ -17,6 +17,7 @@ export interface IMediaDocument extends Omit<IMedia, "postId"> {
 // Interface cho CreateMedia
 export interface ICreateMedia {
   type: "image" | "video" | "audio"; // Loại phương tiện
+  postId: string; // ID của bài viết liên kết
   URL: string; // Đường dẫn đến tệp
   fileSize?: number; // Kích thước tệp (byte)
   duration?: number; // Thời lượng (cho video/audio)
@@ -51,10 +52,17 @@ export interface IPost {
   updatedAt: Date; // Thời gian cập nhật
 }
 
+// Interface cho CreatePost
+export interface ICreatePost {
+  userId: string; // ID của người dùng đăng bài
+  content: string; // Nội dung bài viết
+  media?: ICreateMedia[]; // Danh sách media liên kết
+}
+
 // Interface cho Post trong MongoDB (sử dụng ObjectId)
 export interface IPostDocument
   extends Omit<IPost, "userId" | "media" | "likes"> {
   userId: ObjectId;
-  media: ObjectId[]; // Tham chiếu đến Media
+  media?: ObjectId[]; // Tham chiếu đến Media
   likes: ObjectId[]; // Tham chiếu đến User
 }

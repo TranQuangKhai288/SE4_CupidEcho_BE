@@ -1,12 +1,12 @@
 import {
   IComment,
-  ICreateComment,
+  // ICreateComment,
   ICreateMedia,
   ICreatePost,
   IMedia,
   IPost,
   ICommentDocument,
-  IMediaDocument,
+  // IMediaDocument,
   IPostDocument,
 } from "../../interfaces/post.interface";
 

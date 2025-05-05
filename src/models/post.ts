@@ -21,7 +21,7 @@ const mediaSchema = new Schema<IMediaDocument>(
     URL: {
       type: String,
       required: true,
-      match: /^(https?:\/\/[^\s]+)/, // Kiểm tra định dạng URL
+      // match: /^(https?:\/\/[^\s]+)/, // Kiểm tra định dạng URL
     },
     fileSize: { type: Number },
     duration: { type: Number },
@@ -61,13 +61,13 @@ const commentSchema = new Schema<ICommentDocument>(
       required: true,
       maxlength: 500, // Giới hạn độ dài bình luận
     },
-    media: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Media",
-        default: [],
-      },
-    ],
+    // media: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "Media",
+    //     default: [],
+    //   },
+    // ],
     parentId: {
       type: Schema.Types.ObjectId,
       ref: "Comment",
@@ -117,13 +117,13 @@ const postSchema = new Schema<IPostDocument>(
       type: String,
       required: true,
     },
-    media: [
-      {
-        type: Schema.Types.ObjectId,
-        ref: "Media",
-        default: [],
-      },
-    ],
+    // media: [
+    //   {
+    //     type: Schema.Types.ObjectId,
+    //     ref: "Media",
+    //     default: [],
+    //   },
+    // ],
     likes: [
       {
         type: Schema.Types.ObjectId,

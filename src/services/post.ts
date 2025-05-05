@@ -22,8 +22,9 @@ class PostService {
         media,
       };
       const response = await this.postRepository.create(data);
-      if (typeof response === "string") {
-        return response;
+      console.log("Response createPost here: ", response);
+      if (typeof response === "string" || response === undefined) {
+        return "Error when creating message";
       }
       return response;
     } catch (e) {
