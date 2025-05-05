@@ -15,7 +15,12 @@ router
 router.route("/users/:userId").get(PostController.getListPostsByUserId);
 
 // Route lấy bài viết theo postId
-router.route("/:postId").get(PostController.getPostById);
+router
+  .route("/:postId")
+  .get(PostController.getPostById)
+  .put(authMiddlewareAuthentication, PostController.updatePost)
+  .delete(authMiddlewareAuthentication, PostController.deletePost);
+
 // .post(authMiddlewareAuthentication, MessageController.createMessage);
 //   .put(authMiddlewareAuthentication, ConversationController.updateConversation)
 //   .delete(

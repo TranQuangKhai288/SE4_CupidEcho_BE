@@ -127,9 +127,93 @@ const getListPostsByUserId = async (
   }
 };
 
+const updatePost = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log("Update Post");
+    const { postId } = req.params;
+    const { content, media } = req.body;
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(400).json({
+        status: "ERR",
+        message: "User ID is required",
+      } as IApiResponse<null>);
+      return;
+    }
+
+    if (!content) {
+      res.status(400).json({
+        status: "ERR",
+        message: "Content is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    const response = await postService.updatePost(
+      userId,
+      postId,
+      content,
+      media
+    );
+    if (typeof response === "string" || response === undefined) {
+      res
+        .status(400)
+        .json({ status: "ERR", message: response } as IApiResponse<null>);
+      return;
+    }
+
+    res.status(200).json({
+      status: "OK",
+      message: "Update Post successfully",
+      data: response,
+    } as IApiResponse<IPost>);
+    console.log("Update Post successfully");
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Lỗi khi cập nhật Post",
+    } as IApiResponse<null>);
+  }
+};
+
+const deletePost = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log("Delete Post");
+    const { postId } = req.params;
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(400).json({
+        status: "ERR",
+        message: "User ID is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    const response = await postService.deletePost(postId);
+    if (typeof response === "string" || response === undefined) {
+      res
+        .status(400)
+        .json({ status: "ERR", message: response } as IApiResponse<null>);
+      return;
+    }
+
+    res.status(200).json({
+      status: "OK",
+      message: "Delete Post successfully",
+      data: response,
+    } as IApiResponse<IPost>);
+    console.log("Delete Post successfully");
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Lỗi khi xóa Post",
+    } as IApiResponse<null>);
+  }
+};
+
 export default {
   createPost,
   getPostById,
   getListPosts,
   getListPostsByUserId,
+  updatePost,
+  deletePost,
 };

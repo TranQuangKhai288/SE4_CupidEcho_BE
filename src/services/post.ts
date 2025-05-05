@@ -98,6 +98,48 @@ class PostService {
       return "Error when getting list posts";
     }
   }
+
+  async updatePost(
+    userId: string,
+    postId: string,
+    content: string,
+    media: ICreateMedia[]
+  ): Promise<any> {
+    try {
+      console.log("Update Post");
+      if (!content) {
+        return "Content is required";
+      }
+      const data = {
+        userId,
+        postId,
+        content,
+        media: media.map((item) => item?.URL), // Assuming 'url' is the string property in ICreateMedia
+      };
+      const response = await this.postRepository.update(userId, data);
+      if (typeof response === "string" || response === undefined) {
+        return "Error when updating message";
+      }
+      return response;
+    } catch (e) {
+      console.log(e, "Error when updating message");
+      return "Error when updating message";
+    }
+  }
+
+  async deletePost(postId: string): Promise<any> {
+    try {
+      console.log("Delete Post");
+      const response = await this.postRepository.delete(postId);
+      if (typeof response === "string" || response === undefined) {
+        return "Error when deleting message";
+      }
+      return response;
+    } catch (e) {
+      console.log(e, "Error when deleting message");
+      return "Error when deleting message";
+    }
+  }
 }
 
 export default PostService;

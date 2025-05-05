@@ -47,9 +47,9 @@ export interface IPost {
   userId: string; // ID của người dùng đăng bài
   content: string; // Nội dung bài viết
   media?: string[]; // Danh sách ID của media liên kết
-  likes: string[]; // Danh sách ID của người dùng thích bài viết
-  createdAt: Date; // Thời gian tạo
-  updatedAt: Date; // Thời gian cập nhật
+  likes?: string[]; // Danh sách ID của người dùng thích bài viết
+  createdAt?: Date; // Thời gian tạo
+  updatedAt?: Date; // Thời gian cập nhật
 }
 
 // Interface cho CreatePost
