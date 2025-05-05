@@ -8,7 +8,7 @@ import {
   ICommentDocument,
   IComment,
 } from "../../interfaces/post.interface";
-import { Post, Media, User } from "../../models";
+import { Post, Media, User, Comment } from "../../models";
 import { O } from "@faker-js/faker/dist/airline-CBNP41sR";
 import { ObjectId } from "mongoose";
 
@@ -221,27 +221,34 @@ export class PostMongoRepository implements IPostRepository {
   }
   async update(
     userId: string,
-    data: Partial<IPost>
-  ): Promise<IPostDocument | null> {
+    data: Partial<any>
+  ): Promise<IPostDocument | null | string> {
     try {
-      return null;
-      // const post = await Post.findByIdAndUpdate(
-      //   data._id,
-      //   { ...data },
-      //   { new: true, runValidators: true }
-      // );
-      // if (!post) return null;
-      // // xóa media của post
-      // if (data.media) {
-      //   await Media.deleteMany({ postId: post._id });
-      //   await Promise.all(
-      //     data.media.map(async (media: ICreateMedia) => {
-      //       media.postId = post._id.toString();
-      //       await Media.create(media);
-      //     })
-      //   );
-      // }
-      // return post as unknown as IPostDocument;
+      console.log("Update Post", data);
+      //check xem post có thuộc về user không
+      const post = await Post.findById(data.postId);
+      if (!post) return "Post not found";
+      if (post.userId.toString() !== userId.toString())
+        return "This post is not yours";
+
+      //update post
+      const updatedPost = await Post.findByIdAndUpdate(
+        data.postId,
+        { ...data },
+        { new: true, runValidators: true }
+      );
+      if (!updatedPost) return "Something went wrong when updating post";
+      // xóa media của post
+      if (data.media) {
+        await Media.deleteMany({ postId: updatedPost._id });
+        await Promise.all(
+          data.media.map(async (media: ICreateMedia) => {
+            media.postId = updatedPost._id.toString();
+            await Media.create(media);
+          })
+        );
+      }
+      return updatedPost as unknown as IPostDocument;
     } catch (err: any) {
       console.log(err);
       return err.message;
@@ -259,20 +266,78 @@ export class PostMongoRepository implements IPostRepository {
       return err.message;
     }
   }
-  async findCommentById(id: string): Promise<ICommentDocument | null> {
+  async findAllCommentsByPost(
+    postId: string,
+    page: number,
+    limit: number
+  ): Promise<{
+    comments: ICommentDocument[];
+    pagination: { page: number; limit: number };
+  }> {
     try {
-      const comment = await Post.findById(id);
-      if (!comment) return null;
-      return comment as unknown as ICommentDocument;
+      console.log("Find all comments by postId", postId);
+      const skip = (page - 1) * limit;
+      console.log("Skip: ", skip);
+      // --- Lấy comment theo post ---
+      const comments = await Comment.find({
+        postId,
+      })
+        // .sort({ createdAt: -1 })
+        // .skip(skip)
+        // .limit(limit)
+        .lean();
+      // .populate
+
+      console.log("Comments here: ", comments);
+
+      if (!comments.length) {
+        return { comments: [], pagination: { page, limit } };
+      }
+
+      // const commentIds = comments.map((c) => c._id);
+      const userIds = comments.map((c) => c.userId);
+
+      // --- Gắn media nếu có (giả sử media gắn với commentId) ---
+      // const mediaList = await Media.find(
+      //   { commentId: { $in: commentIds } },
+      //   { url: 1, commentId: 1 }
+      // ).lean();
+      // const mediaMap = new Map<string, any[]>();
+      // for (const media of mediaList) {
+      //   const key = media..toString();
+      //   if (!mediaMap.has(key)) mediaMap.set(key, []);
+      //   mediaMap.get(key)!.push(media);
+      // }
+
+      // --- Gắn thông tin user nếu muốn (avatar, name,...) ---
+      const users = await User.find(
+        { _id: { $in: userIds } },
+        { name: 1, avatar: 1 }
+      ).lean();
+      const userMap = new Map<string, any>();
+      users.forEach((user) => userMap.set(user._id.toString(), user));
+
+      // --- Trả về danh sách comment có media + user ---
+      const enrichedComments = comments.map((comment) => ({
+        ...comment,
+        // media: mediaMap.get(comment._id.toString()) || [],
+        user: userMap.get(comment.userId.toString()) || null,
+      }));
+
+      return {
+        comments: enrichedComments,
+        pagination: { page, limit },
+      };
     } catch (err: any) {
-      console.log(err);
-      return err.message;
+      console.error(err);
+      throw new Error(err.message);
     }
   }
 
   async createComment(comment: IComment): Promise<ICommentDocument> {
     try {
-      const createdComment = await Post.create(comment);
+      console.log("Create Comment", comment);
+      const createdComment = await Comment.create(comment);
       return createdComment as unknown as ICommentDocument;
     } catch (err: any) {
       console.log(err);

@@ -209,6 +209,167 @@ const deletePost = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+const createComment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // console.log("Create Comment");
+    const { id } = req.params;
+    const userId = req.user?._id;
+    const { content } = req.body;
+    if (!userId) {
+      res.status(400).json({
+        status: "ERR",
+        message: "User ID is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    console.log("User ID: ", userId);
+    if (!content) {
+      res.status(400).json({
+        status: "ERR",
+        message: "Content is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    const response = await postService.createComment(
+      userId as string,
+      id,
+      content
+    );
+    if (typeof response === "string" || response === undefined) {
+      res
+        .status(400)
+        .json({ status: "ERR", message: response } as IApiResponse<null>);
+      return;
+    }
+
+    res.status(200).json({
+      status: "OK",
+      message: "Create Comment successfully",
+      data: response,
+    } as IApiResponse<IPost>);
+    console.log("Create Comment successfully");
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Lỗi khi tạo Comment",
+    } as IApiResponse<null>);
+  }
+};
+
+const getCommentByPostId = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    console.log("Get Comment by Post ID");
+    const { id } = req.params;
+    const { page = 1, limit = 10 } = req.query;
+    const response = await postService.getCommentByPostId(
+      id,
+      page as number,
+      limit as number
+    );
+    if (!response) {
+      res.status(404).json({
+        status: "ERR",
+        message: "Comment not found",
+      } as IApiResponse<null>);
+      return;
+    }
+    res.status(200).json({
+      status: "OK",
+      message: "Get comment successfully",
+      data: response,
+    } as IApiResponse<IPost>);
+    console.log("Get comment successfully");
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Error when getting comment by Post ID",
+    } as IApiResponse<null>);
+  }
+};
+
+const updateComment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log("Update Comment");
+    const { commentId } = req.params;
+    const userId = req.user?._id;
+    const { content } = req.body;
+    if (!userId) {
+      res.status(400).json({
+        status: "ERR",
+        message: "User ID is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    if (!content) {
+      res.status(400).json({
+        status: "ERR",
+        message: "Content is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    const response = await postService.updateComment(
+      userId as string,
+      commentId,
+      content
+    );
+    if (typeof response === "string" || response === undefined) {
+      res
+        .status(400)
+        .json({ status: "ERR", message: response } as IApiResponse<null>);
+      return;
+    }
+
+    res.status(200).json({
+      status: "OK",
+      message: "Update Comment successfully",
+      data: response,
+    } as IApiResponse<IPost>);
+    console.log("Update Comment successfully");
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Lỗi khi cập nhật Comment",
+    } as IApiResponse<null>);
+  }
+};
+
+const deleteComment = async (req: Request, res: Response): Promise<void> => {
+  try {
+    console.log("Delete Comment");
+    const { commentId } = req.params;
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(400).json({
+        status: "ERR",
+        message: "User ID is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    const response = await postService.deleteComment(commentId);
+    if (typeof response === "string" || response === undefined) {
+      res
+        .status(400)
+        .json({ status: "ERR", message: response } as IApiResponse<null>);
+      return;
+    }
+
+    res.status(200).json({
+      status: "OK",
+      message: "Delete Comment successfully",
+      data: response,
+    } as IApiResponse<IPost>);
+    console.log("Delete Comment successfully");
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Lỗi khi xóa Comment",
+    } as IApiResponse<null>);
+  }
+};
+
 export default {
   createPost,
   getPostById,
@@ -216,4 +377,8 @@ export default {
   getListPostsByUserId,
   updatePost,
   deletePost,
+  createComment,
+  getCommentByPostId,
+  updateComment,
+  deleteComment,
 };

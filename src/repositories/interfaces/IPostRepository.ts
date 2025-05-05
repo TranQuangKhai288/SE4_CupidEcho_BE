@@ -31,9 +31,19 @@ export interface IPostRepository {
   }>;
   findById(id: string): Promise<IPostDocument | null>;
   create(post: ICreatePost): Promise<IPostDocument>;
-  update(userId: string, data: Partial<IPost>): Promise<IPostDocument | null>;
+  update(
+    userId: string,
+    data: Partial<any>
+  ): Promise<IPostDocument | null | string>;
   delete(id: string): Promise<IPostDocument | null>;
-  findCommentById(id: string): Promise<ICommentDocument | null>;
+  findAllCommentsByPost(
+    postId: string,
+    page: number,
+    limit: number
+  ): Promise<{
+    comments: ICommentDocument[];
+    pagination: { page: number; limit: number };
+  }>;
   createComment(comment: IComment): Promise<ICommentDocument>;
   updateComment(
     id: string,

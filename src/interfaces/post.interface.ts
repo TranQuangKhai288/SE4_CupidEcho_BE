@@ -28,9 +28,9 @@ export interface IComment {
   userId: string; // ID của người dùng bình luận
   postId: string; // ID của bài viết liên kết
   content: string; // Nội dung bình luận
-  media?: string[]; // Danh sách ID của media liên kết
-  parentId?: string | null; // ID của bình luận cha (cho nested comments)
-  createdAt: Date; // Thời gian tạo
+  media?: ObjectId[]; // Danh sách ID của media liên kết
+  parentId?: ObjectId | null; // ID của bình luận cha (cho nested comments)
+  createdAt?: Date; // Thời gian tạo
 }
 
 // Interface cho Comment trong MongoDB (sử dụng ObjectId)
@@ -38,8 +38,8 @@ export interface ICommentDocument
   extends Omit<IComment, "userId" | "postId" | "media" | "parentId"> {
   userId: ObjectId;
   postId: ObjectId;
-  media: ObjectId[]; // Tham chiếu đến Media
-  parentId: ObjectId | null; // Tham chiếu đến Comment cha
+  media?: ObjectId[]; // Tham chiếu đến Media
+  parentId?: ObjectId | null; // Tham chiếu đến Comment cha
 }
 
 // Interface cho Post

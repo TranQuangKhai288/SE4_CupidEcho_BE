@@ -21,6 +21,13 @@ router
   .put(authMiddlewareAuthentication, PostController.updatePost)
   .delete(authMiddlewareAuthentication, PostController.deletePost);
 
+router
+  .route("/comment/:id")
+  .post(authMiddlewareAuthentication, PostController.createComment)
+  .get(authMiddlewareAuthentication, PostController.getCommentByPostId)
+  .put(authMiddlewareAuthentication, PostController.updateComment)
+  .delete(authMiddlewareAuthentication, PostController.deleteComment);
+
 // .post(authMiddlewareAuthentication, MessageController.createMessage);
 //   .put(authMiddlewareAuthentication, ConversationController.updateConversation)
 //   .delete(
