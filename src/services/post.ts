@@ -243,7 +243,6 @@ class PostService {
   }
   async likePost(postId: string, userId: string): Promise<any> {
     try {
-      console.log("Like Post");
       const response = await this.postRepository.likePost(postId, userId);
       if (typeof response === "string" || response === undefined) {
         return "Error when liking post";

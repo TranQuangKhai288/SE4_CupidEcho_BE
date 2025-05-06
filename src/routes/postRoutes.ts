@@ -28,6 +28,11 @@ router
   .put(authMiddlewareAuthentication, PostController.updateComment)
   .delete(authMiddlewareAuthentication, PostController.deleteComment);
 
+//like post
+router
+  .route("/like/:postId")
+  .post(authMiddlewareAuthentication, PostController.likePost);
+
 // .post(authMiddlewareAuthentication, MessageController.createMessage);
 //   .put(authMiddlewareAuthentication, ConversationController.updateConversation)
 //   .delete(

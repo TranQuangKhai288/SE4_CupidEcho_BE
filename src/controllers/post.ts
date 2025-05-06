@@ -370,6 +370,38 @@ const deleteComment = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+const likePost = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { postId } = req.params;
+    const userId = req.user?._id;
+    if (!userId) {
+      res.status(400).json({
+        status: "ERR",
+        message: "User ID is required",
+      } as IApiResponse<null>);
+      return;
+    }
+    const response = await postService.likePost(postId, userId as string);
+    if (typeof response === "string" || response === undefined) {
+      res
+        .status(400)
+        .json({ status: "ERR", message: response } as IApiResponse<null>);
+      return;
+    }
+
+    res.status(200).json({
+      status: "OK",
+      message: "Like Post successfully",
+      data: response,
+    } as IApiResponse<IPost>);
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Lỗi khi thích Post",
+    } as IApiResponse<null>);
+  }
+};
+
 export default {
   createPost,
   getPostById,
@@ -381,4 +413,5 @@ export default {
   getCommentByPostId,
   updateComment,
   deleteComment,
+  likePost,
 };

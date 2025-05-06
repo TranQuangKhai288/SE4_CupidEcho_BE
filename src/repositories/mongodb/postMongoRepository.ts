@@ -410,6 +410,7 @@ export class PostMongoRepository implements IPostRepository {
         post.likes.push(user?._id as unknown as ObjectId);
       }
       const updatedPost = await post.save();
+      console.log("Updated post after like: ", updatedPost);
       return updatedPost as unknown as IPostDocument;
     } catch (err: any) {
       console.log(err);
