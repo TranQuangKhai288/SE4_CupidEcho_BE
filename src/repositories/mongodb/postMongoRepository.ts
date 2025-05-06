@@ -348,25 +348,38 @@ export class PostMongoRepository implements IPostRepository {
   async updateComment(
     id: string,
     data: Partial<IComment>
-  ): Promise<ICommentDocument | null> {
+  ): Promise<ICommentDocument | null | string> {
     try {
-      const comment = await Post.findByIdAndUpdate(
-        id,
+      console.log("Update Comment", data);
+
+      // Truy vấn và cập nhật trong 1 bước: id + userId để đảm bảo quyền
+      const updatedComment = await Comment.findOneAndUpdate(
+        { _id: id, userId: data.userId },
         { ...data },
         { new: true, runValidators: true }
-      );
-      if (!comment) return null;
-      return comment as unknown as ICommentDocument;
+      ).lean(); // Có thể bỏ `.lean()` nếu bạn cần phương thức instance
+
+      if (!updatedComment) return "Not your comment or not found";
+
+      return updatedComment as ICommentDocument;
     } catch (err: any) {
-      console.log(err);
+      console.error(err);
       return err.message;
     }
   }
 
-  async deleteComment(id: string): Promise<ICommentDocument | null> {
+  async deleteComment(
+    id: string,
+    userId: string
+  ): Promise<ICommentDocument | null | string> {
+    console.log("Delete Comment", id);
     try {
-      const comment = await Post.findByIdAndDelete(id);
-      if (!comment) return null;
+      const comment = await Comment.findOneAndDelete({
+        _id: id,
+        userId: userId,
+      }).lean(); // Có thể bỏ `.lean()` nếu bạn cần phương thức instance
+
+      if (!comment) return "Comment not found or not yours";
       return comment as unknown as ICommentDocument;
     } catch (err: any) {
       console.log(err);

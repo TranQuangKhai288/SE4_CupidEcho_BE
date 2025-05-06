@@ -48,8 +48,11 @@ export interface IPostRepository {
   updateComment(
     id: string,
     data: Partial<IComment>
-  ): Promise<ICommentDocument | null>;
-  deleteComment(id: string): Promise<ICommentDocument | null>;
+  ): Promise<ICommentDocument | null | string>;
+  deleteComment(
+    id: string,
+    userId: string
+  ): Promise<ICommentDocument | null | string>;
   //like
   likePost(postId: string, userId: string): Promise<IPostDocument | null>;
 }

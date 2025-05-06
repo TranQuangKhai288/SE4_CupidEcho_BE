@@ -203,7 +203,7 @@ class PostService {
         return "Content is required";
       }
       const data = {
-        commentId,
+        // commentId,
         userId,
         content,
       };
@@ -221,12 +221,19 @@ class PostService {
       return "Error when updating comment";
     }
   }
-  async deleteComment(commentId: string): Promise<any> {
+  async deleteComment(commentId: string, userId: string): Promise<any> {
     try {
       console.log("Delete Comment");
-      const response = await this.postRepository.deleteComment(commentId);
-      if (typeof response === "string" || response === undefined) {
+      const response = await this.postRepository.deleteComment(
+        commentId,
+        userId
+      );
+      console.log("Response deleteComment in services: ", response);
+      if (response === undefined) {
         return "Error when deleting comment";
+      }
+      if (typeof response === "string") {
+        return response;
       }
       return response;
     } catch (e) {

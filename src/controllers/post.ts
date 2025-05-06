@@ -293,7 +293,7 @@ const getCommentByPostId = async (
 const updateComment = async (req: Request, res: Response): Promise<void> => {
   try {
     console.log("Update Comment");
-    const { commentId } = req.params;
+    const { id } = req.params;
     const userId = req.user?._id;
     const { content } = req.body;
     if (!userId) {
@@ -311,8 +311,9 @@ const updateComment = async (req: Request, res: Response): Promise<void> => {
       return;
     }
     const response = await postService.updateComment(
+      id,
       userId as string,
-      commentId,
+
       content
     );
     if (typeof response === "string" || response === undefined) {
@@ -338,8 +339,7 @@ const updateComment = async (req: Request, res: Response): Promise<void> => {
 
 const deleteComment = async (req: Request, res: Response): Promise<void> => {
   try {
-    console.log("Delete Comment");
-    const { commentId } = req.params;
+    const { id } = req.params;
     const userId = req.user?._id;
     if (!userId) {
       res.status(400).json({
@@ -348,7 +348,7 @@ const deleteComment = async (req: Request, res: Response): Promise<void> => {
       } as IApiResponse<null>);
       return;
     }
-    const response = await postService.deleteComment(commentId);
+    const response = await postService.deleteComment(id, userId);
     if (typeof response === "string" || response === undefined) {
       res
         .status(400)
