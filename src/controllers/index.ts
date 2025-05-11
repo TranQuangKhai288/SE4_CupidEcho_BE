@@ -7,6 +7,7 @@ import ConversationController from "./conversation";
 import MessageController from "./message";
 import PostController from "./post";
 import AdminController from "./admin";
+import InterestController from "./interest";
 
 export {
   UserController,
@@ -17,4 +18,5 @@ export {
   MessageController,
   PostController,
   AdminController,
+  InterestController,
 };

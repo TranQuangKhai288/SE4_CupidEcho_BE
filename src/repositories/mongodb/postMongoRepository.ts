@@ -9,7 +9,6 @@ import {
   IComment,
 } from "../../interfaces/post.interface";
 import { Post, Media, User, Comment } from "../../models";
-import { O } from "@faker-js/faker/dist/airline-CBNP41sR";
 import { ObjectId } from "mongoose";
 
 export class PostMongoRepository implements IPostRepository {
@@ -36,7 +35,6 @@ export class PostMongoRepository implements IPostRepository {
       let query: any = {};
 
       if (search) {
-        // Dùng full-text search nếu có từ khóa
         query.$text = { $search: search };
       } else {
         query.$or = [
@@ -45,7 +43,7 @@ export class PostMongoRepository implements IPostRepository {
         ];
       }
 
-      // --- Lấy bài viết chính (ưu tiên lean + projection) ---
+      // --- Lấy bài viết ---
       let posts = await Post.find(query, {
         content: 1,
         userId: 1,
@@ -57,7 +55,6 @@ export class PostMongoRepository implements IPostRepository {
         .limit(limit)
         .lean();
 
-      // --- Nếu thiếu bài, bổ sung bài phổ biến ---
       if (posts.length < limit) {
         const filled = limit - posts.length;
         const popularPosts = await Post.find(
@@ -70,12 +67,10 @@ export class PostMongoRepository implements IPostRepository {
         posts = [...posts, ...popularPosts];
       }
 
-      // --- Lấy media cho tất cả post trong 1 query ---
       const postIds = posts.map((p) => p._id);
-      const mediaList = await Media.find(
-        { postId: { $in: postIds } }
-        // { url: 1, postId: 1 }
-      ).lean();
+
+      // --- Media ---
+      const mediaList = await Media.find({ postId: { $in: postIds } }).lean();
       const mediaMap = new Map<string, any[]>();
       for (const media of mediaList) {
         const key = media.postId.toString();
@@ -83,21 +78,34 @@ export class PostMongoRepository implements IPostRepository {
         mediaMap.get(key)!.push(media);
       }
 
-      const postsWithMedia = posts.map((post) => ({
+      // --- Comments count ---
+      const commentsGrouped = await Comment.aggregate([
+        { $match: { postId: { $in: postIds } } },
+        { $group: { _id: "$postId", count: { $sum: 1 } } },
+      ]);
+      const commentCountMap = new Map<string, number>();
+      for (const c of commentsGrouped) {
+        commentCountMap.set(c._id.toString(), c.count);
+      }
+
+      // --- Gắn media + count ---
+      const postsWithDetails = posts.map((post) => ({
         ...post,
         media: mediaMap.get(post._id.toString()) || [],
+        likeCount: post.likes?.length || 0,
+        commentCount: commentCountMap.get(post._id.toString()) || 0,
       }));
 
-      // --- Random posts chỉ khi có thể cần thêm độ đa dạng (và nên cache ngoài Mongo) ---
+      // --- Random posts ---
       const randomLimit = Math.ceil(limit * 0.2);
       const randomPosts = await Post.aggregate([
         { $sample: { size: randomLimit } },
         { $project: { content: 1, userId: 1, createdAt: 1 } },
       ]);
 
-      // --- Gộp, loại bỏ trùng ---
+      // --- Gộp + loại trùng ---
       const finalMap = new Map<string, any>();
-      [...postsWithMedia, ...randomPosts].forEach((post) => {
+      [...postsWithDetails, ...randomPosts].forEach((post) => {
         finalMap.set(post._id.toString(), post);
       });
 
@@ -259,7 +267,9 @@ export class PostMongoRepository implements IPostRepository {
       const post = await Post.findByIdAndDelete(id);
       if (!post) return null;
       // xóa media của post
-      await Media.findByIdAndDelete(id);
+      await Media.findByIdAndDelete({
+        postId: post._id,
+      });
       return post as unknown as IPostDocument;
     } catch (err: any) {
       console.log(err);
