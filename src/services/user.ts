@@ -26,7 +26,7 @@ class UserService {
   }
 
   async createUser(newUser: ICreateUser): Promise<any> {
-    const { name, email, password, gender } = newUser;
+    const { name, email, password } = newUser;
     try {
       const existingUser = await this.userRepository.findByEmail(email);
       if (existingUser) {
@@ -47,7 +47,7 @@ class UserService {
 
       await this.profileRepository.create({
         userId: createdUser._id,
-        gender: gender || "another",
+        gender: "another",
         location: {
           type: "Point",
           coordinates: [0, 0],

@@ -10,10 +10,10 @@ const emailVerificationTokens: { [key: string]: string } = {};
 
 const createUser = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { name, email, password, confirmPassword, gender } = req.body;
+    const { name, email, password, confirmPassword } = req.body;
 
     // Kiểm tra đầu vào
-    if (!name || !email || !password || !confirmPassword || !gender) {
+    if (!name || !email || !password || !confirmPassword) {
       res.status(400).json({
         status: "ERR",
         message: "All fields are required",
