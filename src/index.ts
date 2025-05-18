@@ -48,7 +48,7 @@ const startServices = async () => {
     await Redis.getInstance();
   } catch (err) {
     console.error("Failed to connect to MongoDB or Redis:", err);
-    process.exit(1);
+    // process.exit(1);
   }
 };
 
@@ -94,5 +94,5 @@ startServices()
   })
   .catch((err) => {
     console.error("Failed to start server:", err);
-    process.exit(1);
+    // process.exit(1);
   });

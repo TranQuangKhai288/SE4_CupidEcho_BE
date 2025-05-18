@@ -183,6 +183,7 @@ export async function runStableMatching(
       }
 
       const score = await calculateMatchScore(userId, candidateId);
+      console.log(`Score for ${userId} and ${candidateId}: ${score}`);
       if (score > 0) {
         preferences.push({ candidateId, score });
       }

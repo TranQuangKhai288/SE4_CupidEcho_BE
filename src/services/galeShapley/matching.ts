@@ -5,8 +5,7 @@ import Redis from "../../config/redis";
 import { conversationService } from "../../services";
 import { IConversation } from "../../interfaces/conversation.interface";
 import Algorithm from "../../models/algorithm";
-import {MatchHistory} from "../../models";
-
+import { MatchHistory } from "../../models";
 
 interface AlgorithmConfig {
   minUser: number;
@@ -152,11 +151,15 @@ const processBatch = async (batch: string[], io: any) => {
         matchedUsers.add(userId1);
         matchedUsers.add(userId2);
         const { conversationId } = await createMatchRecord(userId1, userId2);
-
+        console.log(
+          `Ghép đôi thành công: ${userId1} và ${userId2}, Conversation ID: ${conversationId}`
+        );
         const redis = await Redis.getInstance();
         const client = redis.getClient();
         const socketId1 = await client.get(`socket:${userId1}`);
         const socketId2 = await client.get(`socket:${userId2}`);
+        console.log("socketId1", socketId1);
+        console.log("socketId2", socketId2);
         io.to(socketId1).emit("matching:matched", {
           partnerId: userId2,
           timestamp: new Date(),
@@ -186,12 +189,12 @@ const processBatch = async (batch: string[], io: any) => {
 };
 
 export const runMatchingProcess = async (io: any) => {
-  // console.log("Chạy quá trình ghép đôi...");
-  // console.log("Running matching process, Queue size:", matchingQueue.size);
   // console.log("Algorithm Config:", algorithmConfig);
   if (matchingQueue.size < 2) {
     return;
   }
+  console.log("Running matching process, Queue size:", matchingQueue.size);
+  console.log("Chạy quá trình ghép đôi...");
 
   const now = new Date();
   for (const [userId, { joinTime }] of matchingQueue) {
@@ -250,11 +253,14 @@ export const runMatchingProcess = async (io: any) => {
 };
 
 const createMatchRecord = async (userId1: string, userId2: string) => {
-  console.log(`Tạo bản ghi ghép đôi cho ${userId1} và ${userId2}`);
+  // console.log(`Tạo bản ghi ghép đôi cho ${userId1} và ${userId2}`);
   const participants = [userId1, userId2];
   const conversationData: Partial<IConversation> = { participants };
-  const accessConv = await conversationService.accessConversation(conversationData);
-  const conversationId = typeof accessConv === "string" ? accessConv : accessConv._id;
+  const accessConv = await conversationService.accessConversation(
+    conversationData
+  );
+  const conversationId =
+    typeof accessConv === "string" ? accessConv : accessConv._id;
 
   // Lưu vào MatchHistory
   await MatchHistory.create({

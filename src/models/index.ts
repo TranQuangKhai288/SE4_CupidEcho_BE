@@ -12,6 +12,7 @@ import Conversation from "./conversation";
 import ZodiacCompatibility from "./zodiac";
 import Algorithm from "./algorithm";
 import MatchHistory from "./matchhistory";
+import LoveMatch from "./loveMatch";
 
 export {
   User,
@@ -28,4 +29,5 @@ export {
   ZodiacCompatibility,
   Algorithm,
   MatchHistory,
+  LoveMatch,
 };
