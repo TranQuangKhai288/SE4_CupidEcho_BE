@@ -38,10 +38,14 @@ export class ProfileMongoRepository implements IProfileRepository {
         throw new Error("Invalid interest value");
       }
     }
-
-    const updatedProfile = await Profile.findOneAndUpdate({ userId }, data, {
-      new: true,
-    });
+    console.log("data", data);
+    const updatedProfile = await Profile.findOneAndUpdate(
+      { userId: userId },
+      data,
+      {
+        new: true,
+      }
+    );
 
     //save lại profile
     if (updatedProfile) await updatedProfile.save();

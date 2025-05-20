@@ -25,12 +25,6 @@ const conditionSchema = new Schema<IConditionDocument>(
     zodiac_weight: { type: Number, default: 2 },
     age_weight: { type: Number, default: 2 },
     max_age_difference: { type: Number, default: 2 },
-    candidateList: [
-      {
-        candidateId: { type: Schema.Types.ObjectId, ref: "User" },
-        score: { type: Number, min: 0, max: 10 },
-      },
-    ],
   },
   {
     timestamps: true,

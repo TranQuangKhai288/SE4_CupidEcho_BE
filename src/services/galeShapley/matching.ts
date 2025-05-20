@@ -204,9 +204,11 @@ export const runMatchingProcess = async (io: any) => {
   }
 
   const oldestUser = matchingQueue.values().next().value;
-  const timeWaited = oldestUser
-    ? now.getTime() - oldestUser.joinTime.getTime()
-    : 0;
+  const timeWaited = 2;
+
+  // oldestUser
+  //   ? now.getTime() - oldestUser.joinTime.getTime()
+  //   : 0;
 
   if (timeWaited >= algorithmConfig.maxWaitTime) {
     algorithmConfig.minUser = Math.max(
@@ -218,7 +220,10 @@ export const runMatchingProcess = async (io: any) => {
     );
   }
 
-  if (matchingQueue.size >= algorithmConfig.minUser) {
+  if (
+    matchingQueue.size >= 1
+    // algorithmConfig.minUser
+  ) {
     const batch = Array.from(matchingQueue.keys()).slice(
       0,
       algorithmConfig.minUser
