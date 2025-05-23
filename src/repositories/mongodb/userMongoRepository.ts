@@ -40,30 +40,19 @@ export class UserMongoRepository implements IUserRepository {
       pagination: { page, limit },
     };
   }
-
   async findRecommendUsers(id: string, limit: number = 10): Promise<IUser[]> {
     const userId = new mongoose.Types.ObjectId(id);
-    console.log("userId", userId);
-    console.log("limit", limit);
-    // Lấy thông tin profile và condition của user hiện tại
+
     const userProfile = await mongoose.model("Profile").findOne({ userId });
     const userCondition = await mongoose.model("Condition").findOne({ userId });
 
-    if (!userProfile || !userProfile.location || !userCondition) {
-      return [];
-    }
+    if (!userProfile || !userProfile.location || !userCondition) return [];
 
-    // Tính toán số người dùng từ maxDistance km sang m
     const maxDistanceMeters = userCondition.max_distance_km * 1000;
 
-    // Lấy thông tin người dùng hiện tại để truyền vào pipeline
     const userDetails = await mongoose.model("User").findById(id).lean();
-    if (!userDetails) {
-      return [];
-    }
+    if (!userDetails) return [];
 
-    // Lấy danh sách các profile phù hợp theo khoảng cách và giới tính trước
-    // $geoNear phải là giai đoạn đầu tiên trong pipeline
     const matchingProfiles = await mongoose.model("Profile").aggregate([
       {
         $geoNear: {
@@ -103,9 +92,7 @@ export class UserMongoRepository implements IUserRepository {
       },
     ]);
 
-    // Tính điểm cho mỗi profile dựa trên các tiêu chí
-    const scoredProfiles = matchingProfiles.map((profile) => {
-      // Điểm sở thích - dựa trên số lượng sở thích chung
+    const calculateScore = (profile: any) => {
       const commonInterests =
         profile.interests?.filter((interest: { toString: () => any }) =>
           userProfile.interests?.some(
@@ -114,24 +101,25 @@ export class UserMongoRepository implements IUserRepository {
         ).length || 0;
       const interestScore = commonInterests * userCondition.interest_weight;
 
-      // Điểm khoảng cách - càng gần càng tốt
       const distanceScore =
         ((userCondition.max_distance_km * 1000 - profile.distance) /
           (userCondition.max_distance_km * 1000)) *
         userCondition.distance_weight;
 
-      // Điểm cung hoàng đạo - trùng khớp
       const zodiacScore =
         profile.zodiac === userProfile.zodiac ? userCondition.zodiac_weight : 0;
 
-      // Điểm tuổi - càng gần càng tốt
       const profileAge = profile.birthDate
-        ? (new Date().getTime() - new Date(profile.birthDate).getTime()) /
-          (365 * 24 * 60 * 60 * 1000)
+        ? Math.round(
+            (new Date().getTime() - new Date(profile.birthDate).getTime()) /
+              (365 * 24 * 60 * 60 * 1000)
+          )
         : 0;
       const userAge = userProfile.birthDate
-        ? (new Date().getTime() - new Date(userProfile.birthDate).getTime()) /
-          (365 * 24 * 60 * 60 * 1000)
+        ? Math.round(
+            (new Date().getTime() - new Date(userProfile.birthDate).getTime()) /
+              (365 * 24 * 60 * 60 * 1000)
+          )
         : 0;
       const ageDiff = Math.abs(profileAge - userAge);
       const ageScore =
@@ -139,7 +127,6 @@ export class UserMongoRepository implements IUserRepository {
           ? userCondition.age_weight
           : 0;
 
-      // Tổng điểm
       const totalScore = interestScore + distanceScore + zodiacScore + ageScore;
 
       return {
@@ -152,19 +139,147 @@ export class UserMongoRepository implements IUserRepository {
         createdAt: profile.userInfo.createdAt,
         updatedAt: profile.userInfo.updatedAt,
         score: totalScore,
+        zodiac: profile.zodiac,
+        distance: Math.round((profile.distance / 1000) * 10) / 10,
+        age: profileAge,
+        isFallback: false,
       };
-    });
+    };
 
-    // Sắp xếp theo điểm cao nhất và lấy limit phần tử
-    scoredProfiles.sort((a, b) => b.score - a.score);
+    const scoredProfiles = matchingProfiles.map(calculateScore);
 
-    // Lấy ngẫu nhiên limit người từ top 20
-    const topProfiles = scoredProfiles.slice(
-      0,
-      Math.min(20, scoredProfiles.length)
-    );
-    const shuffled = [...topProfiles].sort(() => 0.5 - Math.random());
-    return shuffled.slice(0, limit) as unknown as IUser[];
+    // Nếu chưa đủ thì lấy thêm random users khác giới
+    let extraProfiles: any[] = [];
+    if (scoredProfiles.length < limit) {
+      const excludeIds = scoredProfiles.map((u) => u._id.toString());
+      excludeIds.push(userId.toString());
+
+      const fallbackGender =
+        userCondition.desired_gender === "male"
+          ? "female"
+          : userCondition.desired_gender === "female"
+          ? "male"
+          : { $exists: true };
+
+      extraProfiles = await mongoose.model("Profile").aggregate([
+        {
+          $match: {
+            userId: {
+              $nin: excludeIds.map((id) => new mongoose.Types.ObjectId(id)),
+            },
+            gender: fallbackGender,
+          },
+        },
+        { $sample: { size: limit - scoredProfiles.length } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "userId",
+            foreignField: "_id",
+            as: "userInfo",
+          },
+        },
+        { $unwind: "$userInfo" },
+        {
+          $project: {
+            _id: 1,
+            userId: 1,
+            gender: 1,
+            interests: 1,
+            birthDate: 1,
+            zodiac: 1,
+            location: 1,
+            userInfo: 1,
+          },
+        },
+      ]);
+
+      const getDistanceInKm = (loc1: any, loc2: any) => {
+        if (!loc1 || !loc2) return null;
+        const R = 6371; // Earth radius in km
+        const dLat =
+          ((loc2.coordinates[1] - loc1.coordinates[1]) * Math.PI) / 180;
+        const dLon =
+          ((loc2.coordinates[0] - loc1.coordinates[0]) * Math.PI) / 180;
+        const lat1 = (loc1.coordinates[1] * Math.PI) / 180;
+        const lat2 = (loc2.coordinates[1] * Math.PI) / 180;
+
+        const a =
+          Math.sin(dLat / 2) ** 2 +
+          Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
+
+      const mappedExtra = extraProfiles.map((profile) => {
+        const distance = getDistanceInKm(
+          userProfile.location,
+          profile.location
+        );
+        const profileAge = profile.birthDate
+          ? Math.round(
+              (new Date().getTime() - new Date(profile.birthDate).getTime()) /
+                (365 * 24 * 60 * 60 * 1000)
+            )
+          : 0;
+        const userAge = userProfile.birthDate
+          ? Math.round(
+              (new Date().getTime() -
+                new Date(userProfile.birthDate).getTime()) /
+                (365 * 24 * 60 * 60 * 1000)
+            )
+          : 0;
+        const ageDiff = Math.abs(profileAge - userAge);
+        const commonInterests =
+          profile.interests?.filter((interest: { toString: () => any }) =>
+            userProfile.interests?.some(
+              (i: { toString: () => any }) =>
+                i.toString() === interest.toString()
+            )
+          ).length || 0;
+        const interestScore = commonInterests * userCondition.interest_weight;
+        const distanceScore =
+          distance != null
+            ? ((userCondition.max_distance_km - distance) /
+                userCondition.max_distance_km) *
+              userCondition.distance_weight
+            : 0;
+        const zodiacScore =
+          profile.zodiac === userProfile.zodiac
+            ? userCondition.zodiac_weight
+            : 0;
+        const ageScore =
+          ageDiff <= userCondition.max_age_difference
+            ? userCondition.age_weight
+            : 0;
+        const totalScore =
+          interestScore + distanceScore + zodiacScore + ageScore;
+
+        return {
+          _id: profile.userInfo._id,
+          name: profile.userInfo.name,
+          email: profile.userInfo.email,
+          avatar: profile.userInfo.avatar,
+          phone: profile.userInfo.phone,
+          isAdmin: profile.userInfo.isAdmin,
+          createdAt: profile.userInfo.createdAt,
+          updatedAt: profile.userInfo.updatedAt,
+          score: totalScore,
+          zodiac: profile.zodiac,
+          distance: distance != null ? Math.round(distance * 10) / 10 : 0,
+          age: profileAge,
+          isFallback: true,
+        };
+      });
+
+      scoredProfiles.push(...mappedExtra);
+    }
+
+    // Sắp xếp theo score giảm dần và cắt theo limit
+    const sorted = scoredProfiles.sort((a, b) => b.score - a.score);
+    return sorted.slice(0, limit).map((profile) => ({
+      ...profile,
+    })) as unknown as IUser[];
   }
 }
 
