@@ -9,7 +9,7 @@ import {
   IComment,
 } from "../../interfaces/post.interface";
 import { Post, Media, User, Comment } from "../../models";
-import { ObjectId } from "mongoose";
+import { ObjectId, Types } from "mongoose";
 
 export class PostMongoRepository implements IPostRepository {
   async findAll(
@@ -24,95 +24,139 @@ export class PostMongoRepository implements IPostRepository {
     try {
       const skip = (page - 1) * limit;
 
-      // --- Tạo keyword dựa trên các bài đã like ---
-      const likedPosts = await Post.find(
+      // Lấy keyword từ các post user đã like (1 truy vấn duy nhất)
+      const likedContents = await Post.find(
         { likes: userId },
         { content: 1 }
       ).lean();
-      const userKeywords = likedPosts.map((p) => p.content).join(" ");
+      const userKeywords = likedContents.map((p) => p.content).join(" ");
 
-      // --- Tạo query ---
-      let query: any = {};
+      // Tạo truy vấn
+      const query: any = search
+        ? { $text: { $search: search } }
+        : {
+            $or: [
+              { userId },
+              { content: { $regex: userKeywords, $options: "i" } },
+            ],
+          };
 
-      if (search) {
-        query.$text = { $search: search };
-      } else {
-        query.$or = [
-          { userId },
-          { content: { $regex: userKeywords, $options: "i" } },
-        ];
-      }
+      // Lấy post kèm populate user, đếm likes ngay trên MongoDB (không xử lý thủ công)
+      const posts = await Post.aggregate([
+        { $match: query },
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        // Join user
+        {
+          $lookup: {
+            from: "users",
+            localField: "userId",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        { $unwind: "$user" },
+        // Join media
+        {
+          $lookup: {
+            from: "media",
+            localField: "_id",
+            foreignField: "postId",
+            as: "media",
+          },
+        },
+        // Đếm comment
+        {
+          $lookup: {
+            from: "comments",
+            localField: "_id",
+            foreignField: "postId",
+            as: "comments",
+          },
+        },
+        {
+          $addFields: {
+            commentCount: { $size: "$comments" },
+            likeCount: { $size: { $ifNull: ["$likes", []] } },
+          },
+        },
+        {
+          $project: {
+            content: 1,
+            createdAt: 1,
+            media: 1,
+            likeCount: 1,
+            commentCount: 1,
+            user: { _id: 1, name: 1, avatar: 1, email: 1 },
+          },
+        },
+      ]);
 
-      // --- Lấy bài viết ---
-      let posts = await Post.find(query, {
-        content: 1,
-        userId: 1,
-        createdAt: 1,
-        likes: 1,
-      })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
-
+      // Nếu thiếu post, bổ sung bằng bài phổ biến (vẫn dùng aggregate để đồng bộ)
       if (posts.length < limit) {
         const filled = limit - posts.length;
-        const popularPosts = await Post.find(
-          {},
-          { content: 1, userId: 1, createdAt: 1, likes: 1 }
-        )
-          .sort({ likes: -1 })
-          .limit(filled)
-          .lean();
-        posts = [...posts, ...popularPosts];
+
+        const popularPosts = await Post.aggregate([
+          { $sort: { likes: -1 } },
+          { $limit: filled },
+          {
+            $lookup: {
+              from: "users",
+              localField: "userId",
+              foreignField: "_id",
+              as: "user",
+            },
+          },
+          { $unwind: "$user" },
+          {
+            $lookup: {
+              from: "media",
+              localField: "_id",
+              foreignField: "postId",
+              as: "media",
+            },
+          },
+          {
+            $lookup: {
+              from: "comments",
+              localField: "_id",
+              foreignField: "postId",
+              as: "comments",
+            },
+          },
+          {
+            $addFields: {
+              commentCount: { $size: "$comments" },
+              likeCount: { $size: { $ifNull: ["$likes", []] } },
+            },
+          },
+          {
+            $project: {
+              content: 1,
+              createdAt: 1,
+              media: 1,
+              likeCount: 1,
+              commentCount: 1,
+              user: { _id: 1, name: 1, avatar: 1, email: 1 },
+            },
+          },
+        ]);
+
+        // Gộp và loại trùng post theo _id
+        const postMap = new Map<string, any>();
+        [...posts, ...popularPosts].forEach((p) => {
+          postMap.set(p._id.toString(), p);
+        });
+
+        return {
+          posts: Array.from(postMap.values()).slice(0, limit),
+          pagination: { page, limit },
+        };
       }
-
-      const postIds = posts.map((p) => p._id);
-
-      // --- Media ---
-      const mediaList = await Media.find({ postId: { $in: postIds } }).lean();
-      const mediaMap = new Map<string, any[]>();
-      for (const media of mediaList) {
-        const key = media.postId.toString();
-        if (!mediaMap.has(key)) mediaMap.set(key, []);
-        mediaMap.get(key)!.push(media);
-      }
-
-      // --- Comments count ---
-      const commentsGrouped = await Comment.aggregate([
-        { $match: { postId: { $in: postIds } } },
-        { $group: { _id: "$postId", count: { $sum: 1 } } },
-      ]);
-      const commentCountMap = new Map<string, number>();
-      for (const c of commentsGrouped) {
-        commentCountMap.set(c._id.toString(), c.count);
-      }
-
-      // --- Gắn media + count ---
-      const postsWithDetails = posts.map((post) => ({
-        ...post,
-        media: mediaMap.get(post._id.toString()) || [],
-        likeCount: post.likes?.length || 0,
-        commentCount: commentCountMap.get(post._id.toString()) || 0,
-      }));
-
-      // --- Random posts ---
-      const randomLimit = Math.ceil(limit * 0.2);
-      const randomPosts = await Post.aggregate([
-        { $sample: { size: randomLimit } },
-        { $project: { content: 1, userId: 1, createdAt: 1 } },
-      ]);
-
-      // --- Gộp + loại trùng ---
-      const finalMap = new Map<string, any>();
-      [...postsWithDetails, ...randomPosts].forEach((post) => {
-        finalMap.set(post._id.toString(), post);
-      });
-
-      const paginatedPosts = Array.from(finalMap.values()).slice(0, limit);
 
       return {
-        posts: paginatedPosts as unknown as IPostDocument[],
+        posts: posts as unknown as IPostDocument[],
         pagination: { page, limit },
       };
     } catch (err: any) {
@@ -123,16 +167,68 @@ export class PostMongoRepository implements IPostRepository {
 
   async findById(id: string): Promise<IPostDocument | null> {
     try {
-      const post = await Post.findById(id);
-      // lấy media của post
-      const media = await Media.find({ postId: id });
-      const postData = { ...post?.toObject(), media };
-      return postData as unknown as IPostDocument;
+      const postWithDetails = await Post.aggregate([
+        { $match: { _id: new Types.ObjectId(id) } },
+
+        // Join user info
+        {
+          $lookup: {
+            from: "users",
+            localField: "userId",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        { $unwind: "$user" },
+
+        // Join media
+        {
+          $lookup: {
+            from: "media",
+            localField: "_id",
+            foreignField: "postId",
+            as: "media",
+          },
+        },
+
+        // Join comments to count
+        {
+          $lookup: {
+            from: "comments",
+            localField: "_id",
+            foreignField: "postId",
+            as: "comments",
+          },
+        },
+
+        // Add fields: likeCount, commentCount
+        {
+          $addFields: {
+            likeCount: { $size: { $ifNull: ["$likes", []] } },
+            commentCount: { $size: "$comments" },
+          },
+        },
+
+        // Chỉ chọn các trường cần thiết
+        {
+          $project: {
+            content: 1,
+            createdAt: 1,
+            media: 1,
+            likeCount: 1,
+            commentCount: 1,
+            user: { _id: 1, name: 1, avatar: 1, email: 1 },
+          },
+        },
+      ]);
+
+      return (postWithDetails[0] as IPostDocument) || null;
     } catch (err: any) {
-      console.log(err);
-      return err.message;
+      console.error(err);
+      throw new Error(err.message);
     }
   }
+
   async findAllByUser(
     userId: string,
     page: number,
@@ -145,54 +241,77 @@ export class PostMongoRepository implements IPostRepository {
     try {
       const skip = (page - 1) * limit;
 
-      // --- Tạo truy vấn ---
-      const query: any = { userId };
+      // Tạo điều kiện truy vấn
+      const matchStage: any = {
+        userId: new Types.ObjectId(userId),
+      };
+
       if (search) {
-        query.content = { $regex: search, $options: "i" }; // hoặc dùng $text nếu đã tạo chỉ mục
+        matchStage.content = { $regex: search, $options: "i" };
       }
 
-      // --- Truy vấn post ---
-      const posts = await Post.find(query, {
-        content: 1,
-        userId: 1,
-        createdAt: 1,
-        likes: 1,
-      })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
+      const result = await Post.aggregate([
+        { $match: matchStage },
 
-      // --- Nếu không có bài viết, return sớm ---
-      if (!posts.length) {
-        return {
-          posts: [],
-          pagination: { page, limit },
-        };
-      }
+        // Sort và phân trang
+        { $sort: { createdAt: -1 } },
+        { $skip: skip },
+        { $limit: limit },
 
-      // --- Truy vấn media cho tất cả post ---
-      const postIds = posts.map((p) => p._id);
-      const mediaList = await Media.find(
-        { postId: { $in: postIds } }
-        // { url: 1, postId: 1 }
-      ).lean();
+        // Join user
+        {
+          $lookup: {
+            from: "users",
+            localField: "userId",
+            foreignField: "_id",
+            as: "user",
+          },
+        },
+        { $unwind: "$user" },
 
-      const mediaMap = new Map<string, any[]>();
-      for (const media of mediaList) {
-        const key = media.postId.toString();
-        if (!mediaMap.has(key)) mediaMap.set(key, []);
-        mediaMap.get(key)!.push(media);
-      }
+        // Join media
+        {
+          $lookup: {
+            from: "media",
+            localField: "_id",
+            foreignField: "postId",
+            as: "media",
+          },
+        },
 
-      // --- Gắn media vào từng post ---
-      const postsWithMedia = posts.map((post) => ({
-        ...post,
-        media: mediaMap.get(post._id.toString()) || [],
-      }));
+        // Join comments để đếm
+        {
+          $lookup: {
+            from: "comments",
+            localField: "_id",
+            foreignField: "postId",
+            as: "comments",
+          },
+        },
+
+        // Tính toán likeCount, commentCount
+        {
+          $addFields: {
+            likeCount: { $size: { $ifNull: ["$likes", []] } },
+            commentCount: { $size: "$comments" },
+          },
+        },
+
+        // Chọn trường cần thiết
+        {
+          $project: {
+            content: 1,
+            createdAt: 1,
+            media: 1,
+            likeCount: 1,
+            commentCount: 1,
+            user: { _id: 1, name: 1, avatar: 1, email: 1 },
+          },
+        },
+      ]);
 
       return {
-        posts: postsWithMedia as unknown as IPostDocument[],
+        posts: result as IPostDocument[],
         pagination: { page, limit },
       };
     } catch (err: any) {
