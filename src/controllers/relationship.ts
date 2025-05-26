@@ -82,7 +82,7 @@ const getAllRelationships = async (
 
     res.status(200).json({
       status: "OK",
-      message: "Danh sách yêu cầu kết bạn",
+      message: "Thành Công",
       data: response,
     });
   } catch (error) {

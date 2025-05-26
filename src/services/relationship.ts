@@ -99,23 +99,27 @@ class RelationshipService {
       //   //cơ chế nạp tiền mới được xem crush
       //   return "Bạn cần có Cupid Premium để xem ai đang crush bạn";
       // }
-      console.log("Fetching relationships with direction:", direction);
+
       if (direction === "received") {
+        console.log("page", page);
+        console.log("limit", limit);
         const requests =
           await this.relationshipRepository.findPendingByReceiver(
             userId,
             type,
-            page,
-            limit
+            Number(page),
+            Number(limit)
           );
         return requests;
       }
       if (direction === "sent") {
+        console.log("page", page);
+        console.log("limit", limit);
         const requests = await this.relationshipRepository.findBySender(
           userId,
           type,
-          page,
-          limit
+          Number(page),
+          Number(limit)
         );
         return requests;
       }

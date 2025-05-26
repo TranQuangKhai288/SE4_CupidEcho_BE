@@ -13,7 +13,7 @@ export interface IRelationshipRepository {
     page: number,
     limit: number
   ): Promise<{
-    relationship: IRelationship[];
+    relationship: any[];
     pagination: { page: number; limit: number };
   }>;
 
@@ -23,7 +23,7 @@ export interface IRelationshipRepository {
     page: number,
     limit: number
   ): Promise<{
-    relationship: IRelationship[];
+    relationship: any[];
     pagination: { page: number; limit: number };
   }>;
   update(
