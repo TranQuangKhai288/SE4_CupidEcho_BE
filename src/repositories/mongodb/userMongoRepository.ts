@@ -40,18 +40,50 @@ export class UserMongoRepository implements IUserRepository {
       pagination: { page, limit },
     };
   }
-  async findRecommendUsers(id: string, limit: number = 10): Promise<IUser[]> {
+  async findRecommendUsers(
+    id: string,
+    page: number = 1,
+    limit: number = 10
+  ): Promise<{
+    recommended: IUser[];
+    pagination: {
+      page: number;
+      limit: number;
+      hasNextPage: boolean;
+    };
+  }> {
     const userId = new mongoose.Types.ObjectId(id);
 
     const userProfile = await mongoose.model("Profile").findOne({ userId });
     const userCondition = await mongoose.model("Condition").findOne({ userId });
+    const existingRelationships = await mongoose
+      .model("Relationship")
+      .find({ $or: [{ user1: userId }, { user2: userId }] })
+      .select("user1 user2")
+      .lean();
 
-    if (!userProfile || !userProfile.location || !userCondition) return [];
+    const relatedUserIds = new Set<string>();
+    existingRelationships.forEach((rel) => {
+      relatedUserIds.add(rel.user1.toString());
+      relatedUserIds.add(rel.user2.toString());
+    });
+    relatedUserIds.delete(userId.toString());
+
+    if (!userProfile || !userProfile.location || !userCondition) {
+      return {
+        recommended: [],
+        pagination: { page, limit, hasNextPage: false },
+      };
+    }
 
     const maxDistanceMeters = userCondition.max_distance_km * 1000;
-
     const userDetails = await mongoose.model("User").findById(id).lean();
-    if (!userDetails) return [];
+    if (!userDetails) {
+      return {
+        recommended: [],
+        pagination: { page, limit, hasNextPage: false },
+      };
+    }
 
     const matchingProfiles = await mongoose.model("Profile").aggregate([
       {
@@ -100,15 +132,12 @@ export class UserMongoRepository implements IUserRepository {
           )
         ).length || 0;
       const interestScore = commonInterests * userCondition.interest_weight;
-
       const distanceScore =
         ((userCondition.max_distance_km * 1000 - profile.distance) /
           (userCondition.max_distance_km * 1000)) *
         userCondition.distance_weight;
-
       const zodiacScore =
         profile.zodiac === userProfile.zodiac ? userCondition.zodiac_weight : 0;
-
       const profileAge = profile.birthDate
         ? Math.round(
             (new Date().getTime() - new Date(profile.birthDate).getTime()) /
@@ -148,9 +177,9 @@ export class UserMongoRepository implements IUserRepository {
 
     const scoredProfiles = matchingProfiles.map(calculateScore);
 
-    // Nếu chưa đủ thì lấy thêm random users khác giới
+    // Nếu chưa đủ thì lấy thêm fallback users
     let extraProfiles: any[] = [];
-    if (scoredProfiles.length < limit) {
+    if (scoredProfiles.length < limit * page) {
       const excludeIds = scoredProfiles.map((u) => u._id.toString());
       excludeIds.push(userId.toString());
 
@@ -170,7 +199,7 @@ export class UserMongoRepository implements IUserRepository {
             gender: fallbackGender,
           },
         },
-        { $sample: { size: limit - scoredProfiles.length } },
+        { $sample: { size: limit * page - scoredProfiles.length } },
         {
           $lookup: {
             from: "users",
@@ -196,14 +225,13 @@ export class UserMongoRepository implements IUserRepository {
 
       const getDistanceInKm = (loc1: any, loc2: any) => {
         if (!loc1 || !loc2) return null;
-        const R = 6371; // Earth radius in km
+        const R = 6371;
         const dLat =
           ((loc2.coordinates[1] - loc1.coordinates[1]) * Math.PI) / 180;
         const dLon =
           ((loc2.coordinates[0] - loc1.coordinates[0]) * Math.PI) / 180;
         const lat1 = (loc1.coordinates[1] * Math.PI) / 180;
         const lat2 = (loc2.coordinates[1] * Math.PI) / 180;
-
         const a =
           Math.sin(dLat / 2) ** 2 +
           Math.sin(dLon / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
@@ -275,11 +303,18 @@ export class UserMongoRepository implements IUserRepository {
       scoredProfiles.push(...mappedExtra);
     }
 
-    // Sắp xếp theo score giảm dần và cắt theo limit
     const sorted = scoredProfiles.sort((a, b) => b.score - a.score);
-    return sorted.slice(0, limit).map((profile) => ({
-      ...profile,
-    })) as unknown as IUser[];
+    const startIndex = (page - 1) * limit;
+    const paginated = sorted.slice(startIndex, startIndex + limit);
+
+    return {
+      recommended: paginated as unknown as IUser[],
+      pagination: {
+        page,
+        limit,
+        hasNextPage: startIndex + limit < sorted.length,
+      },
+    };
   }
 }
 

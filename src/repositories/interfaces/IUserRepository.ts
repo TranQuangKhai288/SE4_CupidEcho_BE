@@ -10,5 +10,16 @@ export interface IUserRepository {
     page: number,
     limit: number
   ): Promise<{ users: IUser[]; pagination: { page: number; limit: number } }>;
-  findRecommendUsers(id: string, limit: number): Promise<IUser[]>;
+  findRecommendUsers(
+    id: string,
+    page: number,
+    limit: number
+  ): Promise<{
+    recommended: IUser[];
+    pagination: {
+      page: number;
+      limit: number;
+      hasNextPage: boolean;
+    };
+  }>;
 }

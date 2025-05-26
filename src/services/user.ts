@@ -183,9 +183,17 @@ class UserService {
     }
   }
 
-  async getRecommendUsers(id: string, limit: number): Promise<any> {
+  async getRecommendUsers(
+    id: string,
+    page: number,
+    limit: number
+  ): Promise<any> {
     try {
-      const users = await this.userRepository.findRecommendUsers(id, limit);
+      const users = await this.userRepository.findRecommendUsers(
+        id,
+        page,
+        limit
+      );
       return users;
     } catch (e) {
       console.log(e, "Lỗi khi lấy danh sách người dùng gợi ý");

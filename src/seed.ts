@@ -1,341 +1,472 @@
 import mongoose from "mongoose";
-import { faker } from "@faker-js/faker";
 import bcrypt from "bcrypt";
-import dotenv from "dotenv";
-import User from "./models/user";
-import { IUser } from "./interfaces/user.interface";
-import { IProfileDocument } from "./interfaces/profile.interface";
-import { IConditionDocument } from "./interfaces/condition.interface";
-// import { any } from "./interfaces/";
-import Profile from "./models/profile";
-import UserCondition from "./models/condition";
-import ZodiacCompatibility from "./models/zodiac";
+import { User, Profile, UserCondition, Relationship } from "./models"; // Adjust path as needed
 import Interest from "./models/interest";
-import { ObjectId } from "mongoose";
 
-dotenv.config();
+// Vietnamese names data
+const vietnameseNames = {
+  male: [
+    "Nguyễn Văn Anh",
+    "Trần Minh Tùng",
+    "Lê Quang Huy",
+    "Phạm Đức Thắng",
+    "Hoàng Việt Dũng",
+    "Võ Minh Khoa",
+    "Đỗ Thanh Long",
+    "Bùi Quốc Huy",
+    "Đinh Văn Nam",
+    "Lý Minh Tuấn",
+    "Ngô Đức Anh",
+    "Dương Văn Hải",
+    "Tạ Minh Quân",
+    "Vũ Đình Khang",
+    "Mai Quốc Việt",
+    "Chu Văn Đức",
+    "Phan Minh Tâm",
+    "Lưu Quang Minh",
+    "Hồ Văn Thành",
+    "Cao Minh Hưng",
+    "Trương Đức Duy",
+    "Lê Văn Hoàng",
+    "Nguyễn Minh Phúc",
+    "Trần Quốc Bảo",
+    "Phạm Văn Tú",
+    "Hoàng Minh Đức",
+    "Võ Quang Hùng",
+    "Đỗ Văn Thịnh",
+    "Bùi Minh Tài",
+    "Đinh Quốc Dũng",
+    "Lý Văn Phong",
+    "Ngô Minh Hiếu",
+    "Dương Quốc Trung",
+    "Tạ Văn Lâm",
+    "Vũ Minh Sơn",
+    "Mai Quang Tuấn",
+    "Chu Văn Hưng",
+    "Phan Minh Nhật",
+    "Lưu Quốc Khánh",
+    "Hồ Minh Đạt",
+    "Cao Văn Thắng",
+    "Trương Minh An",
+    "Lê Quốc Huy",
+    "Nguyễn Văn Kiệt",
+    "Trần Minh Khôi",
+    "Phạm Quang Duy",
+    "Hoàng Văn Bình",
+    "Võ Minh Tân",
+    "Đỗ Quốc Tuấn",
+    "Bùi Văn Hòa",
+  ],
+  female: [
+    "Nguyễn Thị Lan",
+    "Trần Thu Hương",
+    "Lê Thị Mai",
+    "Phạm Thu Thảo",
+    "Hoàng Thị Linh",
+    "Võ Thu Hà",
+    "Đỗ Thị Ngọc",
+    "Bùi Thu Trang",
+    "Đinh Thị Hoa",
+    "Lý Thu Huyền",
+    "Ngô Thị Ánh",
+    "Dương Thu Phương",
+    "Tạ Thị Loan",
+    "Vũ Thu Giang",
+    "Mai Thị Vân",
+    "Chu Thu Hằng",
+    "Phan Thị Yến",
+    "Lưu Thu Hiền",
+    "Hồ Thị Bích",
+    "Cao Thu Hoài",
+    "Trương Thị Diệu",
+    "Lê Thu Nga",
+    "Nguyễn Thị Xuân",
+    "Trần Thu Dung",
+    "Phạm Thị Kim",
+    "Hoàng Thu Thủy",
+    "Võ Thị Hạnh",
+    "Đỗ Thu Huyền",
+    "Bùi Thị Thanh",
+    "Đinh Thu Quỳnh",
+    "Lý Thị Phượng",
+    "Ngô Thu Hiếu",
+    "Dương Thị Tâm",
+    "Tạ Thu Linh",
+    "Vũ Thị Hồng",
+    "Mai Thu Tuyết",
+    "Chu Thị Hạnh",
+    "Phan Thu Nhung",
+    "Lưu Thị Cẩm",
+    "Hồ Thu Thúy",
+    "Cao Thị Mỹ",
+    "Trương Thu Hà",
+    "Lê Thị Bảo",
+    "Nguyễn Thu Phương",
+    "Trần Thị Minh",
+    "Phạm Thu Hằng",
+    "Hoàng Thị Duyên",
+    "Võ Thu Tâm",
+    "Đỗ Thị Lệ",
+    "Bùi Thu Hiền",
+  ],
+};
 
-const NUM_USERS = 5; // Tạo 100 user
-const PASSWORD_HASH = bcrypt.hashSync("password123", 10); // Mật khẩu mặc định
+// Vietnam locations (Ho Chi Minh City and Hanoi)
+const vietnamLocations = {
+  "Ho Chi Minh City": [
+    {
+      name: "Quận 1",
+      coords: [106.7008, 10.7769],
+      address: "Quận 1, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận 3",
+      coords: [106.6917, 10.7756],
+      address: "Quận 3, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận 5",
+      coords: [106.6753, 10.7572],
+      address: "Quận 5, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận 7",
+      coords: [106.7219, 10.7333],
+      address: "Quận 7, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận Bình Thạnh",
+      coords: [106.7136, 10.8008],
+      address: "Quận Bình Thạnh, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận Tân Bình",
+      coords: [106.6528, 10.8006],
+      address: "Quận Tân Bình, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận Gò Vấp",
+      coords: [106.6772, 10.8372],
+      address: "Quận Gò Vấp, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận Phú Nhuận",
+      coords: [106.6881, 10.7975],
+      address: "Quận Phú Nhuận, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận 2",
+      coords: [106.7431, 10.7544],
+      address: "Quận 2, TP. Hồ Chí Minh, Việt Nam",
+    },
+    {
+      name: "Quận 4",
+      coords: [106.7053, 10.7575],
+      address: "Quận 4, TP. Hồ Chí Minh, Việt Nam",
+    },
+  ],
+  Hanoi: [
+    {
+      name: "Quận Hoàn Kiếm",
+      coords: [105.8542, 21.0285],
+      address: "Quận Hoàn Kiếm, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Ba Đình",
+      coords: [105.8342, 21.0369],
+      address: "Quận Ba Đình, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Đống Đa",
+      coords: [105.8278, 21.0139],
+      address: "Quận Đống Đa, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Hai Bà Trưng",
+      coords: [105.8619, 21.0139],
+      address: "Quận Hai Bà Trưng, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Hoàng Mai",
+      coords: [105.8681, 20.9819],
+      address: "Quận Hoàng Mai, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Long Biên",
+      coords: [105.8969, 21.0467],
+      address: "Quận Long Biên, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Nam Từ Liêm",
+      coords: [105.7647, 21.0381],
+      address: "Quận Nam Từ Liêm, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Bắc Từ Liêm",
+      coords: [105.7542, 21.0631],
+      address: "Quận Bắc Từ Liêm, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Thanh Xuân",
+      coords: [105.8053, 20.9908],
+      address: "Quận Thanh Xuân, Hà Nội, Việt Nam",
+    },
+    {
+      name: "Quận Cầu Giấy",
+      coords: [105.7897, 21.0328],
+      address: "Quận Cầu Giấy, Hà Nội, Việt Nam",
+    },
+  ],
+};
 
-const HOCHIMINH_LAT = 10.8231;
-const HOCHIMINH_LNG = 106.6297;
+// Zodiac signs
+const zodiacs = [
+  "Aries",
+  "Taurus",
+  "Gemini",
+  "Cancer",
+  "Leo",
+  "Virgo",
+  "Libra",
+  "Scorpio",
+  "Sagittarius",
+  "Capricorn",
+  "Aquarius",
+  "Pisces",
+];
 
-// Hàm tạo vị trí ngẫu nhiên trong phạm vi TP.HCM
-function getRandomLocation(): { latitude: number; longitude: number } {
-  const latitudeOffset = (Math.random() - 0.5) * 0.05;
-  const longitudeOffset = (Math.random() - 0.5) * 0.05;
+// Utility functions
+const getRandomElement = (arr: any) =>
+  arr[Math.floor(Math.random() * arr.length)];
+const getRandomElements = (arr: any, min: any, max: any) => {
+  const count = Math.floor(Math.random() * (max - min + 1)) + min;
+  const shuffled = [...arr].sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, count);
+};
+const getRandomInt = (min: any, max: any) =>
+  Math.floor(Math.random() * (max - min + 1)) + min;
+const getRandomBirthDate = () => {
+  const start = new Date(1990, 0, 1);
+  const end = new Date(2002, 11, 31);
+  return new Date(
+    start.getTime() + Math.random() * (end.getTime() - start.getTime())
+  );
+};
 
-  return {
-    latitude: HOCHIMINH_LAT + latitudeOffset,
-    longitude: HOCHIMINH_LNG + longitudeOffset,
-  };
-}
+// Generate random weights that sum to 10
+const generateWeights = () => {
+  let weights = [
+    getRandomInt(1, 4), // interest_weight
+    getRandomInt(1, 4), // distance_weight
+    getRandomInt(1, 4), // zodiac_weight
+    getRandomInt(1, 4), // age_weight
+  ];
 
-// Điều chỉnh trọng số để tổng bằng 10
-function adjustWeights(weights: number[]): number[] {
-  const total = weights.reduce((sum, w) => sum + w, 0);
-  if (total === 0) return [2.5, 2.5, 2.5, 2.5];
-  return weights.map((w) => Math.round((w / total) * 10 * 10) / 10);
-}
-
-// async function seedDatabase(): Promise<void> {
-//   try {
-//     mongoose.set("strictQuery", false);
-//     await mongoose.connect(process.env.MONGO_DB as string);
-//     console.log("🔗 Đã kết nối tới MongoDB");
-
-//     // Lấy danh sách sở thích
-//     const allInterests: any[] = await Interest.find();
-//     if (allInterests.length === 0) {
-//       console.log("⚠️ Không có sở thích nào trong database!");
-//       return;
-//     }
-
-//     const users: IUser[] = [];
-//     const profiles: IProfileDocument[] = [];
-//     const conditions: IConditionDocument[] = [];
-
-//     for (let i = 0; i < NUM_USERS; i++) {
-//       const gender = faker.helpers.arrayElement(["male", "female"]);
-//       const desired_gender = gender === "male" ? "female" : "male";
-//       const email = faker.internet.email().toLowerCase();
-
-//       // Tạo user
-//       const user = new User({
-//         name: faker.person.fullName(),
-//         email,
-//         password: PASSWORD_HASH,
-//         avatar: faker.image.avatar(),
-//         phone: faker.phone.number(),
-//         isAdmin: false,
-//       });
-//       users.push(user);
-
-//       // Chọn ngẫu nhiên 5-8 sở thích
-//       const shuffledInterests = allInterests.sort(() => 0.5 - Math.random());
-//       const selectedInterests = shuffledInterests
-//         .slice(0, Math.floor(Math.random() * 4) + 5)
-//         .map((i) => i._id as unknown as ObjectId);
-
-//       // Tạo profile
-//       const profile = new Profile({
-//         userId: user._id,
-//         gender,
-//         birthDate: faker.date.birthdate({ min: 18, max: 50, mode: "age" }),
-//         address: {
-//           formattedAddress: faker.location.streetAddress(),
-//           city: "Ho Chi Minh",
-//           country: "Vietnam",
-//         },
-//         location: {
-//           coordinates: [
-//             getRandomLocation().longitude,
-//             getRandomLocation().latitude,
-//           ],
-//         },
-//         interests: selectedInterests,
-//         zodiac: faker.helpers.arrayElement([
-//           "Aries",
-//           "Taurus",
-//           "Gemini",
-//           "Cancer",
-//           "Leo",
-//           "Virgo",
-//           "Libra",
-//           "Scorpio",
-//           "Sagittarius",
-//           "Capricorn",
-//           "Aquarius",
-//           "Pisces",
-//         ]),
-//         education: faker.helpers.arrayElement([
-//           "Unknown",
-//           "Primary school",
-//           "Secondary school",
-//           "High school",
-//           "College",
-//           "University",
-//         ]),
-//       });
-//       profiles.push(profile);
-
-//       // Tạo trọng số ghép đôi
-//       const baseWeights = Array(4)
-//         .fill(0)
-//         .map(() => faker.number.int({ min: 0, max: 10 }));
-//       const adjustedWeights = adjustWeights(baseWeights);
-
-//       // Tạo điều kiện ghép đôi
-//       const condition = new UserCondition({
-//         userId: user._id,
-//         desired_gender,
-//         interest_weight: adjustedWeights[0],
-//         distance_weight: adjustedWeights[1],
-//         zodiac_weight: adjustedWeights[2],
-//         education_weight: adjustedWeights[3],
-//         max_distance_km: faker.number.int({ min: 2, max: 20 }),
-//       });
-//       conditions.push(condition);
-//     }
-
-//     // Lưu vào database
-//     await User.insertMany(users);
-//     await Profile.insertMany(profiles);
-//     await UserCondition.insertMany(conditions);
-
-//     console.log(`✅ Đã tạo ${NUM_USERS} user, profile & condition thành công!`);
-//     console.log("👤 User IDs:", users.map((u) => `${u._id}`).join(", "));
-
-//     // Kiểm tra số lượng dữ liệu
-//     console.log(`📊 Số user: ${await User.countDocuments()}`);
-//     console.log(`📊 Số profile: ${await Profile.countDocuments()}`);
-//     console.log(`📊 Số condition: ${await UserCondition.countDocuments()}`);
-
-//     mongoose.connection.close();
-//   } catch (error) {
-//     console.error("❌ Lỗi khi seed dữ liệu:", error);
-//     mongoose.connection.close();
-//   }
-// }
-
-// Chạy seed
-
-async function seedDatabase(): Promise<void> {
-  try {
-    const zodiacData = {
-      Aries: {
-        Taurus: 5,
-        Gemini: 10,
-        Cancer: 4,
-        Leo: 9,
-        Virgo: 3.5,
-        Libra: 7.5,
-        Scorpio: 3,
-        Sagittarius: 8.5,
-        Capricorn: 6,
-        Aquarius: 8,
-        Pisces: 2,
-      },
-      Taurus: {
-        Aries: 6,
-        Gemini: 7.5,
-        Cancer: 7,
-        Leo: 8,
-        Virgo: 5,
-        Libra: 9.5,
-        Scorpio: 6,
-        Sagittarius: 2,
-        Capricorn: 4,
-        Aquarius: 9,
-        Pisces: 3,
-      },
-      Gemini: {
-        Aries: 8,
-        Taurus: 7,
-        Cancer: 8,
-        Leo: 5,
-        Virgo: 9,
-        Libra: 9,
-        Scorpio: 4,
-        Sagittarius: 9,
-        Capricorn: 5,
-        Aquarius: 9,
-        Pisces: 4,
-      },
-      Cancer: {
-        Aries: 7,
-        Taurus: 8,
-        Gemini: 5,
-        Leo: 9,
-        Virgo: 6,
-        Libra: 9,
-        Scorpio: 9,
-        Sagittarius: 4,
-        Capricorn: 8,
-        Aquarius: 5,
-        Pisces: 10,
-      },
-      Leo: {
-        Aries: 9,
-        Taurus: 6,
-        Gemini: 9,
-        Cancer: 6,
-        Virgo: 8,
-        Libra: 5,
-        Scorpio: 8,
-        Sagittarius: 4,
-        Capricorn: 9,
-        Aquarius: 5,
-        Pisces: 5,
-      },
-      Virgo: {
-        Aries: 6,
-        Taurus: 9,
-        Gemini: 6,
-        Cancer: 9,
-        Leo: 5,
-        Libra: 8,
-        Scorpio: 6,
-        Sagittarius: 5,
-        Capricorn: 9,
-        Aquarius: 7,
-        Pisces: 9,
-      },
-      Libra: {
-        Aries: 8,
-        Taurus: 7,
-        Gemini: 9,
-        Cancer: 6,
-        Leo: 8,
-        Virgo: 5,
-        Scorpio: 9,
-        Sagittarius: 5,
-        Capricorn: 8,
-        Aquarius: 8,
-        Pisces: 8,
-      },
-      Scorpio: {
-        Aries: 9,
-        Taurus: 9,
-        Gemini: 5,
-        Cancer: 9,
-        Leo: 4,
-        Virgo: 8,
-        Libra: 5,
-        Sagittarius: 8,
-        Capricorn: 4,
-        Aquarius: 9,
-        Pisces: 10,
-      },
-      Sagittarius: {
-        Aries: 9,
-        Taurus: 5,
-        Gemini: 9,
-        Cancer: 4,
-        Leo: 7,
-        Virgo: 5,
-        Libra: 9,
-        Scorpio: 4,
-        Capricorn: 7,
-        Aquarius: 5,
-        Pisces: 6,
-      },
-      Capricorn: {
-        Aries: 6,
-        Taurus: 9,
-        Gemini: 4,
-        Cancer: 8,
-        Leo: 5,
-        Virgo: 9,
-        Libra: 5,
-        Scorpio: 10,
-        Sagittarius: 4,
-        Aquarius: 8,
-        Pisces: 4,
-      },
-      Aquarius: {
-        Aries: 8,
-        Taurus: 4,
-        Gemini: 9,
-        Cancer: 4,
-        Leo: 8,
-        Virgo: 4,
-        Libra: 10,
-        Scorpio: 4,
-        Sagittarius: 10,
-        Capricorn: 7,
-        Pisces: 7,
-      },
-      Pisces: {
-        Aries: 6,
-        Taurus: 7,
-        Gemini: 5,
-        Cancer: 9,
-        Leo: 5,
-        Virgo: 6,
-        Libra: 8,
-        Scorpio: 9,
-        Sagittarius: 4,
-        Capricorn: 8,
-        Aquarius: 7,
-        Pisces: 10,
-      },
-    };
-
-    mongoose.set("strictQuery", false);
-    await mongoose.connect(process.env.MONGO_DB as string);
-    console.log("🔗 Đã kết nối tới MongoDB");
-
-    const dataToSave = Object.entries(zodiacData).map(([sign, scores]) => ({
-      zodiacSign: sign,
-      compatibility: scores,
-    }));
-    await ZodiacCompatibility.insertMany(dataToSave);
-    mongoose.connection.close();
-    console.log("✅ Đã tạo dữ liệu zodiac compatibility thành công!");
-  } catch (error) {
-    console.error("❌ Lỗi khi seed dữ liệu:", error);
+  const sum = weights.reduce((a, b) => a + b, 0);
+  if (sum !== 10) {
+    // Adjust the first weight to make sum = 10
+    weights[0] = weights[0] + (10 - sum);
+    // Ensure no negative weights
+    if (weights[0] < 1) {
+      weights = [3, 3, 2, 2]; // fallback
+    }
   }
-}
-seedDatabase();
+
+  return weights;
+};
+
+const seedDatabase = async () => {
+  try {
+    console.log("🌱 Starting database seeding...");
+
+    // Clear existing data
+    console.log("🧹 Clearing existing data...");
+    await User.deleteMany({});
+    await Profile.deleteMany({});
+    await UserCondition.deleteMany({});
+    await Relationship.deleteMany({});
+
+    // Get existing interests
+    console.log("📋 Fetching existing interests...");
+    const interests = await Interest.find();
+    console.log(interests, "interests");
+    if (interests.length === 0) {
+      throw new Error(
+        "No interests found in database. Please seed interests first."
+      );
+    }
+    console.log(`Found ${interests.length} interests`);
+
+    // Generate users
+    console.log("👥 Creating 100 users...");
+    const users = [];
+    const profiles = [];
+    const conditions = [];
+
+    // Get all location options
+    const allLocations = [
+      ...vietnamLocations["Ho Chi Minh City"],
+      ...vietnamLocations["Hanoi"],
+    ];
+
+    for (let i = 0; i < 100; i++) {
+      const gender = Math.random() > 0.5 ? "male" : "female";
+      const name = getRandomElement(vietnameseNames[gender]);
+      const email = `user${i + 1}@example.com`;
+      const password = await bcrypt.hash("123456", 10);
+      const location = getRandomElement(allLocations);
+      const birthDate = getRandomBirthDate();
+      const userInterests = getRandomElements(interests, 6, 10);
+      const weights = generateWeights();
+
+      // Create user
+      const user = new User({
+        name,
+        email,
+        password,
+        avatar: `https://i.pravatar.cc/300?img=${i + 1}`,
+        phone: `+84${getRandomInt(900000000, 999999999)}`,
+        isAdmin: false,
+      });
+
+      users.push(user);
+
+      // Create profile
+      const profile = new Profile({
+        userId: user._id,
+        gender,
+        address: {
+          formattedAddress: location.address,
+          city: location.address.includes("Hồ Chí Minh")
+            ? "Ho Chi Minh City"
+            : "Hanoi",
+          country: "Vietnam",
+        },
+        location: {
+          type: "Point",
+          coordinates: [
+            location.coords[0] + (Math.random() - 0.5) * 0.01, // Add small random offset
+            location.coords[1] + (Math.random() - 0.5) * 0.01,
+          ],
+        },
+        interests: userInterests.map((interest) => interest._id),
+        birthDate,
+        zodiac: getRandomElement(zodiacs),
+        isActivated: true,
+      });
+
+      profiles.push(profile);
+
+      // Create condition
+      const condition = new UserCondition({
+        userId: user._id,
+        desired_gender: getRandomElement(["male", "female", "another"]),
+        max_distance_km: getRandomInt(5, 50),
+        interest_weight: weights[0],
+        distance_weight: weights[1],
+        zodiac_weight: weights[2],
+        age_weight: weights[3],
+        max_age_difference: getRandomInt(2, 10),
+      });
+
+      conditions.push(condition);
+
+      if ((i + 1) % 20 === 0) {
+        console.log(`Created ${i + 1} users...`);
+      }
+    }
+
+    // Save all users, profiles, and conditions
+    console.log("💾 Saving users to database...");
+    await User.insertMany(users);
+
+    console.log("💾 Saving profiles to database...");
+    await Profile.insertMany(profiles);
+
+    console.log("💾 Saving conditions to database...");
+    await UserCondition.insertMany(conditions);
+
+    // Create relationships
+    console.log("💕 Creating relationships...");
+    const relationships = [];
+
+    for (let i = 0; i < users.length; i++) {
+      const crushCount = getRandomInt(3, 7);
+      const currentUser = users[i];
+
+      // Get random users to crush on (excluding self)
+      const potentialCrushes = users.filter((_, index) => index !== i);
+      const crushTargets = getRandomElements(
+        potentialCrushes,
+        crushCount,
+        crushCount
+      );
+
+      for (const target of crushTargets) {
+        relationships.push(
+          new Relationship({
+            senderId: currentUser._id,
+            receiverId: target._id,
+            type: "crush",
+            status: "pending",
+          })
+        );
+      }
+    }
+
+    console.log("💾 Saving relationships to database...");
+    await Relationship.insertMany(relationships);
+
+    // Summary
+    console.log("\n🎉 Seeding completed successfully!");
+    console.log("📊 Summary:");
+    console.log(`   👥 Users created: ${users.length}`);
+    console.log(`   📍 Profiles created: ${profiles.length}`);
+    console.log(`   ⚙️  Conditions created: ${conditions.length}`);
+    console.log(`   💕 Relationships created: ${relationships.length}`);
+    console.log(`   🎯 Interests used: ${interests.length}`);
+
+    // Sample data info
+    console.log("\n📋 Sample data info:");
+    console.log(`   🏙️  Cities: Ho Chi Minh City, Hanoi`);
+    console.log(`   🎂 Age range: 22-34 years old`);
+    console.log(`   🎨 Interests per user: 6-10`);
+    console.log(`   💕 Crushes per user: 3-7`);
+    console.log(`   ⚖️  All condition weights sum to 10`);
+  } catch (error) {
+    console.error("❌ Seeding failed:", error);
+    throw error;
+  }
+};
+
+// Execute seeder
+const runSeeder = async () => {
+  try {
+    // Connect to MongoDB
+    mongoose.set("strictQuery", false);
+    mongoose
+      .connect(
+        `mongodb+srv://21522185:TQKhai21522185@cluster0.87r1let.mongodb.net/CupidEchoTestData?retryWrites=true&w=majority`
+      )
+      .then(() => {
+        console.log("Connect Db success!");
+      })
+      .catch((err) => {
+        console.log(err);
+      });
+
+    await seedDatabase();
+
+    console.log("✅ Seeding process completed successfully!");
+    process.exit(0);
+  } catch (error) {
+    console.error("💥 Seeding process failed:", error);
+    process.exit(1);
+  }
+};
+
+// Export functions for use in other files
+export { seedDatabase, runSeeder };
+
+// Run seeder if this file is executed directly
+runSeeder();

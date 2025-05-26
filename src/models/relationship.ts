@@ -6,7 +6,7 @@ const relationshipSchema = new Schema(
     receiverId: { type: Schema.Types.ObjectId, ref: "User", required: true },
     type: {
       type: String,
-      enum: ["friend-request", "crush", "block"], // Các loại tương tác
+      enum: ["crush", "block"], // Các loại tương tác
       required: true,
     },
     status: {
