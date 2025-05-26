@@ -19,7 +19,7 @@ class RelationshipService {
       }
 
       if (senderId === receiverId) {
-        return "Không thể gửi yêu cầu kết bạn cho chính mình";
+        return "Không thể gửi yêu cầu cho chính mình";
       }
 
       //check type
@@ -40,8 +40,8 @@ class RelationshipService {
       );
       return createdRequest;
     } catch (e) {
-      console.log(e, "Lỗi khi gửi yêu cầu kết bạn");
-      return "Lỗi khi gửi yêu cầu kết bạn";
+      console.log(e, "Lỗi khi gửi yêu cầu");
+      return "Lỗi khi gửi yêu cầu";
     }
   }
 
@@ -87,28 +87,41 @@ class RelationshipService {
   }
 
   async getAllRelationships(
-    receiverId: string,
+    direction: "sent" | "received" | "both",
+    userId: string,
     type: string,
     page: number,
     limit: number
   ): Promise<any> {
     try {
       //check type:
-      if (type === "crush") {
-        //cơ chế nạp tiền mới được xem crush
-        return "Bạn cần có Cupid Premium để xem ai đang crush bạn";
+      // if (type === "crush") {
+      //   //cơ chế nạp tiền mới được xem crush
+      //   return "Bạn cần có Cupid Premium để xem ai đang crush bạn";
+      // }
+      console.log("Fetching relationships with direction:", direction);
+      if (direction === "received") {
+        const requests =
+          await this.relationshipRepository.findPendingByReceiver(
+            userId,
+            type,
+            page,
+            limit
+          );
+        return requests;
       }
-
-      const requests = await this.relationshipRepository.findPendingByReceiver(
-        receiverId,
-        type,
-        page,
-        limit
-      );
-      return requests;
+      if (direction === "sent") {
+        const requests = await this.relationshipRepository.findBySender(
+          userId,
+          type,
+          page,
+          limit
+        );
+        return requests;
+      }
     } catch (e) {
-      console.log(e, "Lỗi khi lấy danh sách yêu cầu kết bạn");
-      return "Lỗi khi lấy danh sách yêu cầu kết bạn";
+      console.log(e, "Lỗi khi lấy danh sách yêu cầu");
+      return "Lỗi khi lấy danh sách yêu cầu";
     }
   }
 

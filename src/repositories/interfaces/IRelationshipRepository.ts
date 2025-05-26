@@ -16,6 +16,16 @@ export interface IRelationshipRepository {
     relationship: IRelationship[];
     pagination: { page: number; limit: number };
   }>;
+
+  findBySender(
+    senderId: string,
+    type: string,
+    page: number,
+    limit: number
+  ): Promise<{
+    relationship: IRelationship[];
+    pagination: { page: number; limit: number };
+  }>;
   update(
     id: string,
     data: Partial<IRelationship>

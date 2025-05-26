@@ -8,7 +8,6 @@ import MessageController from "./message";
 import PostController from "./post";
 import AdminController from "./admin";
 import InterestController from "./interest";
-import LoveMatch from "./loveMatch";
 
 export {
   UserController,
@@ -20,5 +19,4 @@ export {
   PostController,
   AdminController,
   InterestController,
-  LoveMatch,
 };

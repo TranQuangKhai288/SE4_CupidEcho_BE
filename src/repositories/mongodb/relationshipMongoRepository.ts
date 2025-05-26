@@ -60,6 +60,34 @@ export class RelationshipMongoRepository implements IRelationshipRepository {
     };
   }
 
+  async findBySender(
+    senderId: string,
+    type: string,
+    page: number,
+    limit: number
+  ): Promise<{
+    relationship: IRelationship[];
+    pagination: { page: number; limit: number };
+  }> {
+    // set pagination
+    const skip = (page - 1) * limit;
+
+    const requests = await Relationship.find({
+      senderId: senderId,
+      status: "pending",
+      type: type,
+    })
+      .skip(skip)
+      .limit(limit);
+
+    console.log("pagination", page, limit);
+
+    return {
+      relationship: requests.map((request) => this.mapToIRelationship(request)),
+      pagination: { page, limit },
+    };
+  }
+
   async update(
     id: string,
     data: Partial<IRelationship>

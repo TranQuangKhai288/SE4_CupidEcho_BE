@@ -51,17 +51,26 @@ const getAllRelationships = async (
   res: Response
 ): Promise<void> => {
   try {
-    const receiverId = req.user?._id;
+    const userId = req.user?._id;
 
-    if (!receiverId) {
+    if (!userId) {
       res.status(400).json({ status: "ERR", message: "Yêu cầu ID người nhận" });
       return;
     }
     //get type relationship
-    const { type, page = 1, limit = 10 } = req.query;
+    const { type, page = 1, limit = 10, direction = "both" } = req.query;
+    console.log("direction", direction);
+    // Ensure direction is of the correct type
+    const allowedDirections = ["both", "sent", "received"];
+    const directionValue =
+      typeof direction === "string" && allowedDirections.includes(direction)
+        ? (direction as "both" | "sent" | "received")
+        : "both";
+    // Ensure type is of the correct type
 
     const response = await relationshipService.getAllRelationships(
-      receiverId.toString(),
+      directionValue,
+      userId.toString(),
       type as string,
       page as unknown as number,
       limit as unknown as number
