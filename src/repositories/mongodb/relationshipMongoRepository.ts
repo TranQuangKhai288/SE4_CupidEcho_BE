@@ -1,18 +1,39 @@
-import { Relationship, User } from "../../models";
+import { Relationship, User, Notification } from "../../models";
 import { IRelationship } from "../../interfaces/relationship.interface";
 import { IRelationshipRepository } from "../interfaces";
 import mongoose from "mongoose";
 
 export class RelationshipMongoRepository implements IRelationshipRepository {
-  async create(request: IRelationship): Promise<IRelationship> {
+  async create(request: IRelationship): Promise<IRelationship | null | string> {
     //check is user exist
-    const checkUser = await User.findById(request.receiverId);
-    if (!checkUser) {
-      throw new Error("Người nhận không tồn tại");
+    try {
+      const checkUser = await User.findById(request.receiverId);
+      const user = await User.findById(request.senderId);
+      if (!checkUser) {
+        throw new Error("Người nhận không tồn tại");
+      }
+      const createdRequest = await Relationship.create(request);
+
+      if (request.status === "pending") {
+        const resNoti = await Notification.create({
+          userId: request.receiverId, // người nhận thông báo là chủ post
+          type: "comment",
+          content: `${user?.name} đã cho bạn biết rằng ${user?.name} đang để ý bạn`,
+          link: `/relationship/`,
+          relatedUserId: request.senderId,
+          // objectId: post._id,
+          objectType: "relationship",
+        });
+
+        console.log(resNoti, "resNoti");
+      }
+
+      // return createdRequest as IRelationship;
+      return this.mapToIRelationship(createdRequest.toObject());
+    } catch (e) {
+      console.log(e);
+      return null;
     }
-    const createdRequest = await Relationship.create(request);
-    // return createdRequest as IRelationship;
-    return this.mapToIRelationship(createdRequest.toObject());
   }
 
   async findById(id: string): Promise<IRelationship | null> {
@@ -456,12 +477,32 @@ export class RelationshipMongoRepository implements IRelationshipRepository {
     id: string,
     data: Partial<IRelationship>
   ): Promise<IRelationship | null> {
-    const updatedRequest = await Relationship.findByIdAndUpdate(id, data, {
-      new: true,
-    });
-    return updatedRequest
-      ? this.mapToIRelationship(updatedRequest.toObject())
-      : null;
+    try {
+      const updatedRequest = await Relationship.findByIdAndUpdate(id, data, {
+        new: true,
+      });
+
+      // if (request.status === "pending") {
+      //   const resNoti = await Notification.create({
+      //     userId: request.receiverId, // người nhận thông báo là chủ post
+      //     type: "comment",
+      //     content: `${user?.name} đã cho bạn biết rằng ${user?.name} đang để ý bạn`,
+      //     link: `/relationship/`,
+      //     relatedUserId: request.senderId,
+      //     // objectId: post._id,
+      //     objectType: "relationship",
+      //   });
+
+      //   console.log(resNoti, "resNoti");
+      // }
+
+      return updatedRequest
+        ? this.mapToIRelationship(updatedRequest.toObject())
+        : null;
+    } catch (e) {
+      console.log(e);
+      return null;
+    }
   }
 
   async delete(id: string): Promise<void> {

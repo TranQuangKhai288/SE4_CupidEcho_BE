@@ -1,7 +1,7 @@
 import { IRelationship } from "../../interfaces/relationship.interface";
 
 export interface IRelationshipRepository {
-  create(request: IRelationship): Promise<IRelationship>;
+  create(request: IRelationship): Promise<IRelationship | null | string>;
   findById(id: string): Promise<IRelationship | null>;
   findByUsers(
     requesterId: string,
