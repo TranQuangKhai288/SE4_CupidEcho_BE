@@ -23,13 +23,13 @@ router
 
 router
   .route("/requests/:id")
-  .delete(
-    authMiddlewareAuthentication,
-    RelationshipController.rejectRelationshipRequest
-  ) // Từ chối lời mời
+  // .delete(
+  //   authMiddlewareAuthentication,
+  //   RelationshipController.rejectRelationshipRequest
+  // ) // Từ chối lời mời
   .put(
     authMiddlewareAuthentication,
-    RelationshipController.acceptRelationshipRequest
+    RelationshipController.changeRelationshipRequest
   ); // Chấp nhận lời mời
 
 router

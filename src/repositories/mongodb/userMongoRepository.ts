@@ -58,14 +58,21 @@ export class UserMongoRepository implements IUserRepository {
     const userCondition = await mongoose.model("Condition").findOne({ userId });
     const existingRelationships = await mongoose
       .model("Relationship")
-      .find({ $or: [{ user1: userId }, { user2: userId }] })
-      .select("user1 user2")
+      .find({
+        $or: [
+          { senderId: userId },
+          {
+            receiverId: userId,
+          },
+        ],
+      })
+      .select("senderId receiverId")
       .lean();
 
     const relatedUserIds = new Set<string>();
     existingRelationships.forEach((rel) => {
-      relatedUserIds.add(rel.user1.toString());
-      relatedUserIds.add(rel.user2.toString());
+      relatedUserIds.add(rel.senderId.toString());
+      relatedUserIds.add(rel.receiverId.toString());
     });
     relatedUserIds.delete(userId.toString());
 
@@ -93,7 +100,12 @@ export class UserMongoRepository implements IUserRepository {
           maxDistance: maxDistanceMeters,
           spherical: true,
           query: {
-            userId: { $ne: userId },
+            userId: {
+              $ne: userId,
+              $nin: Array.from(relatedUserIds).map(
+                (id) => new mongoose.Types.ObjectId(id)
+              ),
+            },
             gender:
               userCondition.desired_gender === "another"
                 ? { $exists: true }
@@ -182,6 +194,7 @@ export class UserMongoRepository implements IUserRepository {
     if (scoredProfiles.length < limit * page) {
       const excludeIds = scoredProfiles.map((u) => u._id.toString());
       excludeIds.push(userId.toString());
+      relatedUserIds.forEach((id) => excludeIds.push(id));
 
       const fallbackGender =
         userCondition.desired_gender === "male"

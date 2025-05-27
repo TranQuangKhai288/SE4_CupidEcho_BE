@@ -1,5 +1,6 @@
 import { IRelationship } from "../interfaces/relationship.interface";
 import { IRelationshipRepository } from "../repositories/interfaces";
+type RelationshipStatus = "pending" | "accepted" | "rejected" | "ignored";
 
 class RelationshipService {
   constructor(private relationshipRepository: IRelationshipRepository) {}
@@ -7,7 +8,8 @@ class RelationshipService {
   async createRelationshipRequest(
     senderId: string,
     receiverId: string,
-    type: string
+    type: string,
+    status: RelationshipStatus
   ): Promise<any> {
     try {
       const existingRequest = await this.relationshipRepository.findByUsers(
@@ -26,12 +28,18 @@ class RelationshipService {
       if (type !== "friend-request" && type !== "crush" && type !== "block") {
         return "Loại tương tác không hợp lệ";
       }
+      if (
+        !["pending", "accepted", "rejected", "ignored"].includes(status) ||
+        !status
+      ) {
+        return "Status không hợp lệ";
+      }
 
       const newRequest: IRelationship = {
         senderId,
         receiverId,
         type: type,
-        status: "pending",
+        status: status,
         createdAt: new Date(),
       };
 
@@ -45,7 +53,10 @@ class RelationshipService {
     }
   }
 
-  async acceptRelationshipRequest(pendingId: string): Promise<any> {
+  async changeRelationshipRequest(
+    pendingId: string,
+    status: RelationshipStatus
+  ): Promise<any> {
     try {
       const request = await this.relationshipRepository.findById(pendingId);
       if (!request) {
@@ -58,7 +69,7 @@ class RelationshipService {
 
       const updatedRequest = await this.relationshipRepository.update(
         pendingId,
-        { status: "accepted" }
+        { status: status }
       );
       return updatedRequest;
     } catch (e) {
@@ -90,6 +101,7 @@ class RelationshipService {
     direction: "sent" | "received" | "both",
     userId: string,
     type: string,
+    status: string,
     page: number,
     limit: number
   ): Promise<any> {
@@ -99,6 +111,17 @@ class RelationshipService {
       //   //cơ chế nạp tiền mới được xem crush
       //   return "Bạn cần có Cupid Premium để xem ai đang crush bạn";
       // }
+      if (status && status === "accepted") {
+        console.log("page", page);
+        console.log("limit", limit);
+        const requests = await this.relationshipRepository.findAcceptedByUserId(
+          userId,
+          type,
+          Number(page),
+          Number(limit)
+        );
+        return requests;
+      }
 
       if (direction === "received") {
         console.log("page", page);
