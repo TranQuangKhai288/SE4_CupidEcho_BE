@@ -1,39 +1,74 @@
 import mongoose, { Schema, Document } from "mongoose";
-import {
-  INotification,
-  INotificationDocument,
-} from "../interfaces/notification.interface";
-const NotificationSchema = new Schema<INotificationDocument>(
+
+export interface INotification extends Document {
+  userId: mongoose.Types.ObjectId; // Ai nhận thông báo
+  type: "like" | "comment" | "relationship_request" | "relationship_accepted";
+  content: string; // Nội dung thông báo (có thể tự động hoặc lưu custom)
+  link?: string; // Link điều hướng (nếu có)
+  isRead: boolean;
+  relatedUserId?: mongoose.Types.ObjectId; // Ai là người tạo ra thông báo này
+  objectId?: mongoose.Types.ObjectId; // Đối tượng liên quan (post, relationship, comment)
+  objectType?: "post" | "comment" | "relationship"; // Loại đối tượng liên quan
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const NotificationSchema = new Schema<INotification>(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
-    }, // Ai nhận thông báo
+    },
     type: {
       type: String,
-      enum: ["message", "like", "post", "comment"],
+      enum: [
+        "like",
+        "comment",
+        "relationship_request",
+        "relationship_accepted",
+      ],
       required: true,
-    }, // Loại thông báo
-    content: { type: String, required: true }, // Nội dung thông báo
-    link: { type: String }, // Link điều hướng (nếu có)
-    isRead: { type: Boolean, default: false }, // Đã đọc hay chưa
+    },
+    content: { type: String, required: true },
+    link: { type: String },
+    isRead: { type: Boolean, default: false },
+
+    relatedUserId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    objectId: {
+      type: mongoose.Schema.Types.ObjectId,
+    },
+    objectType: {
+      type: String,
+      enum: ["post", "comment", "relationship"],
+    },
   },
   {
     timestamps: true,
     toObject: {
       transform: (doc, ret) => {
-        ret.userId = ret.userId.toString(); // Chuyển userId thành string
+        ret.userId = ret.userId?.toString?.();
+        ret.relatedUserId = ret.relatedUserId?.toString?.();
+        ret.objectId = ret.objectId?.toString?.();
         return ret;
       },
     },
     toJSON: {
       transform: (doc, ret) => {
-        ret.userId = ret.userId.toString(); // Chuyển userId thành string
+        ret.userId = ret.userId?.toString?.();
+        ret.relatedUserId = ret.relatedUserId?.toString?.();
+        ret.objectId = ret.objectId?.toString?.();
         return ret;
       },
     },
   }
 );
+const Notification = mongoose.model<INotification>(
+  "Notification",
+  NotificationSchema
+);
 
-module.exports = mongoose.model("Notification", NotificationSchema);
+export default Notification;

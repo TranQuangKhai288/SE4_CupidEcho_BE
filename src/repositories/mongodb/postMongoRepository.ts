@@ -8,7 +8,7 @@ import {
   ICommentDocument,
   IComment,
 } from "../../interfaces/post.interface";
-import { Post, Media, User, Comment } from "../../models";
+import { Post, Media, User, Comment, Notification } from "../../models";
 import { ObjectId, Types } from "mongoose";
 
 export class PostMongoRepository implements IPostRepository {
@@ -79,6 +79,7 @@ export class PostMongoRepository implements IPostRepository {
           $addFields: {
             commentCount: { $size: "$comments" },
             likeCount: { $size: { $ifNull: ["$likes", []] } },
+            isLiked: { $in: [userId, { $ifNull: ["$likes", []] }] },
           },
         },
         {
@@ -87,6 +88,7 @@ export class PostMongoRepository implements IPostRepository {
             createdAt: 1,
             media: 1,
             likeCount: 1,
+            isLiked: 1,
             commentCount: 1,
             user: { _id: 1, name: 1, avatar: 1, email: 1 },
           },
@@ -129,6 +131,7 @@ export class PostMongoRepository implements IPostRepository {
             $addFields: {
               commentCount: { $size: "$comments" },
               likeCount: { $size: { $ifNull: ["$likes", []] } },
+              isLiked: { $in: [userId, { $ifNull: ["$likes", []] }] },
             },
           },
           {
@@ -137,6 +140,7 @@ export class PostMongoRepository implements IPostRepository {
               createdAt: 1,
               media: 1,
               likeCount: 1,
+              isLiked: 1,
               commentCount: 1,
               user: { _id: 1, name: 1, avatar: 1, email: 1 },
             },
@@ -417,8 +421,6 @@ export class PostMongoRepository implements IPostRepository {
         .lean();
       // .populate
 
-      console.log("Comments here: ", comments);
-
       if (!comments.length) {
         return { comments: [], pagination: { page, limit } };
       }
@@ -463,10 +465,33 @@ export class PostMongoRepository implements IPostRepository {
     }
   }
 
-  async createComment(comment: IComment): Promise<ICommentDocument> {
+  async createComment(
+    comment: IComment
+  ): Promise<ICommentDocument | null | string> {
     try {
-      console.log("Create Comment", comment);
+      console.log("Create Comment heheehe", comment);
+      const { postId, userId, content } = comment;
+      const post = await Post.findById(postId);
+      const user = await User.findById(userId);
+      if (!post) return "Post not found";
+      //check post
+
       const createdComment = await Comment.create(comment);
+      if (post.userId.toString() !== userId.toString()) {
+        const resNoti = await Notification.create({
+          userId: post.userId, // người nhận thông báo là chủ post
+          type: "comment",
+          content: `${user?.name} đã bình luận bài viết của bạn.`,
+          link: `/posts/${post._id}`,
+          relatedUserId: userId,
+          objectId: post._id,
+          objectType: "post",
+        });
+
+        console.log(resNoti, "resNoti");
+      } else {
+        console.log("Comment on your post");
+      }
       return createdComment as unknown as ICommentDocument;
     } catch (err: any) {
       console.log(err);
@@ -537,6 +562,17 @@ export class PostMongoRepository implements IPostRepository {
       } else {
         // Nếu chưa thích, thêm vào danh sách thích
         post.likes.push(user?._id as unknown as ObjectId);
+        if (post.userId.toString() !== userId.toString()) {
+          await Notification.create({
+            userId: post.userId, // người nhận thông báo là chủ post
+            type: "like",
+            content: `${user?.name} đã thích bài viết của bạn.`,
+            link: `/posts/${post._id}`,
+            relatedUserId: userId,
+            objectId: post._id,
+            objectType: "post",
+          });
+        }
       }
       const updatedPost = await post.save();
       console.log("Updated post after like: ", updatedPost);

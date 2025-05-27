@@ -44,7 +44,7 @@ export interface IPostRepository {
     comments: ICommentDocument[];
     pagination: { page: number; limit: number };
   }>;
-  createComment(comment: IComment): Promise<ICommentDocument>;
+  createComment(comment: IComment): Promise<ICommentDocument | null | string>;
   updateComment(
     id: string,
     data: Partial<IComment>
