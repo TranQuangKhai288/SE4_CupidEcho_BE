@@ -14,9 +14,11 @@ export class UserMongoRepository implements IUserRepository {
     return createdUser.toObject(); // _id đã là string
   }
 
-  async findById(id: string): Promise<IUser | null> {
+  async findById(id: string): Promise<any | null> {
     const user = await User.findById(id);
-    return user ? user.toObject() : null;
+    if (!user) return null;
+    const { password, ...userWithoutPassword } = user.toObject();
+    return userWithoutPassword;
   }
 
   async update(id: string, data: Partial<IUser>): Promise<IUser | null> {
