@@ -136,7 +136,6 @@ export const stopUserMatching = async (userId: string, io?: any) => {
     batch.delete(userIdStr);
   }
 };
-
 const processBatch = async (batch: string[], io: any) => {
   try {
     const batchSet = new Set(batch);
@@ -144,40 +143,57 @@ const processBatch = async (batch: string[], io: any) => {
 
     const matches = await runStableMatching(batch);
     console.log(matches, "matches from algorithm");
+
     const matchedUsers = new Set<string>();
 
     for (const [userId1, userId2] of matches.entries()) {
-      if (userId1 < userId2) {
-        matchedUsers.add(userId1);
-        matchedUsers.add(userId2);
-        const { conversationId } = await createMatchRecord(userId1, userId2);
+      // Sắp xếp để đảm bảo idA < idB về mặt từ vựng
+      const [idA, idB] = [userId1, userId2].sort();
+
+      // Kiểm tra xem 2 user đã được ghép chưa
+      if (!matchedUsers.has(idA) && !matchedUsers.has(idB)) {
+        matchedUsers.add(idA);
+        matchedUsers.add(idB);
+
+        const { conversationId } = await createMatchRecord(idA, idB);
         console.log(
-          `Ghép đôi thành công: ${userId1} và ${userId2}, Conversation ID: ${conversationId}`
+          `Ghép đôi thành công: ${idA} và ${idB}, Conversation ID: ${conversationId}`
         );
+
         const redis = await Redis.getInstance();
         const client = redis.getClient();
-        const socketId1 = await client.get(`socket:${userId1}`);
-        const socketId2 = await client.get(`socket:${userId2}`);
-        console.log("socketId1", socketId1);
-        console.log("socketId2", socketId2);
-        io.to(socketId1).emit("matching:matched", {
-          partnerId: userId2,
-          timestamp: new Date(),
-          conversationId: conversationId,
-        });
-        io.to(socketId2).emit("matching:matched", {
-          partnerId: userId1,
-          timestamp: new Date(),
-          conversationId: conversationId,
-        });
+        const socketIdA = await client.get(`socket:${idA}`);
+        const socketIdB = await client.get(`socket:${idB}`);
+
+        console.log("socketIdA", socketIdA);
+        console.log("socketIdB", socketIdB);
+
+        // Gửi sự kiện cho cả hai người dùng
+        if (socketIdA) {
+          io.to(socketIdA).emit("matching:matched", {
+            partnerId: idB,
+            timestamp: new Date(),
+            conversationId,
+          });
+        }
+
+        if (socketIdB) {
+          io.to(socketIdB).emit("matching:matched", {
+            partnerId: idA,
+            timestamp: new Date(),
+            conversationId,
+          });
+        }
       }
     }
 
+    // Xoá batch khỏi danh sách đang xử lý
     const index = processingBatches.indexOf(batchSet);
     if (index !== -1) {
       processingBatches.splice(index, 1);
     }
 
+    // Trả về danh sách user chưa được ghép
     return batch.filter((userId) => !matchedUsers.has(userId));
   } catch (error) {
     console.error(`Lỗi khi xử lý lô: ${error}`);

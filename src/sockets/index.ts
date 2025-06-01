@@ -42,6 +42,17 @@ export const setupSocketEvents = (io: Server) => {
       // Thiết lập các sự kiện
       setupConvEvents(socket);
       setupNotificationEvents(socket);
+      socket.on("webrtc:signal", async (signal) => {
+        const { to } = signal;
+
+        if (to) {
+          const targetSocketId = await redisClient.get(`socket:${to}`);
+          io.to(targetSocketId || "").emit("webrtc:signal", {
+            ...signal,
+            from: socket.id,
+          });
+        }
+      });
 
       socket.on("disconnect", async () => {
         console.log("Người dùng đã ngắt kết nối:", socket.id);
