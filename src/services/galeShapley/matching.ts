@@ -30,7 +30,7 @@ const getAlgorithmConfig = async (): Promise<AlgorithmConfig> => {
       );
       return {
         minUser: 20,
-        maxWaitTime: 6000,
+        maxWaitTime: 5000,
         userTimeout: 12000,
       };
     }
@@ -50,7 +50,7 @@ const getAlgorithmConfig = async (): Promise<AlgorithmConfig> => {
 };
 
 let algorithmConfig: AlgorithmConfig = {
-  minUser: 0,
+  minUser: 10,
   maxWaitTime: 6000,
   userTimeout: 1000,
 };
@@ -205,12 +205,10 @@ const processBatch = async (batch: string[], io: any) => {
 };
 
 export const runMatchingProcess = async (io: any) => {
-  // console.log("Algorithm Config:", algorithmConfig);
   if (matchingQueue.size < 2) {
     return;
   }
-  console.log("Running matching process, Queue size:", matchingQueue.size);
-  console.log("Chạy quá trình ghép đôi...");
+  const timeWaited = 0;
 
   const now = new Date();
   for (const [userId, { joinTime }] of matchingQueue) {
@@ -219,57 +217,49 @@ export const runMatchingProcess = async (io: any) => {
     }
   }
 
-  const oldestUser = matchingQueue.values().next().value;
-  const timeWaited = 2;
-
-  // oldestUser
-  //   ? now.getTime() - oldestUser.joinTime.getTime()
-  //   : 0;
-
-  if (timeWaited >= algorithmConfig.maxWaitTime) {
-    algorithmConfig.minUser = Math.max(
-      2,
-      Math.floor(algorithmConfig.minUser / 2)
-    );
-    console.log(
-      `Giảm minUser xuống ${algorithmConfig.minUser} do thời gian chờ lâu`
-    );
+  if (matchingQueue.size < algorithmConfig.minUser) {
+    if (timeWaited >= algorithmConfig.maxWaitTime) {
+      algorithmConfig.minUser = Math.max(
+        2,
+        Math.floor(algorithmConfig.minUser / 2)
+      );
+      console.log(
+        `Giảm minUser xuống ${algorithmConfig.minUser} do thời gian chờ lâu`
+      );
+    }
+    return;
   }
+  console.log(" Đủ minUser, tiến hành ghép đôi");
+  // Đủ minUser, tiến hành ghép đôi
+  const batch = Array.from(matchingQueue.keys()).slice(
+    0,
+    algorithmConfig.minUser
+  );
+  for (const userId of batch) {
+    matchingQueue.delete(userId);
+  }
+  const redis = await Redis.getInstance();
+  const client = redis.getClient();
+  await client.set(
+    "matching_queue",
+    JSON.stringify(Object.fromEntries(matchingQueue))
+  );
 
-  if (
-    matchingQueue.size >= 1
-    // algorithmConfig.minUser
-  ) {
-    const batch = Array.from(matchingQueue.keys()).slice(
-      0,
-      algorithmConfig.minUser
-    );
-    for (const userId of batch) {
-      matchingQueue.delete(userId);
+  const unmatchedUsers = await processBatch(batch, io);
+
+  unmatchedUsers.forEach((userId) => {
+    if (!matchingQueue.has(userId)) {
+      matchingQueue.set(userId, { joinTime: new Date() });
     }
-    const redis = await Redis.getInstance();
-    const client = redis.getClient();
-    await client.set(
-      "matching_queue",
-      JSON.stringify(Object.fromEntries(matchingQueue))
-    );
+  });
+  await client.set(
+    "matching_queue",
+    JSON.stringify(Object.fromEntries(matchingQueue))
+  );
 
-    const unmatchedUsers = await processBatch(batch, io);
-
-    unmatchedUsers.forEach((userId) => {
-      if (!matchingQueue.has(userId)) {
-        matchingQueue.set(userId, { joinTime: new Date() });
-      }
-    });
-    await client.set(
-      "matching_queue",
-      JSON.stringify(Object.fromEntries(matchingQueue))
-    );
-
-    if (matchingQueue.size === 0) {
-      algorithmConfig.minUser = (await getAlgorithmConfig()).minUser;
-      console.log(`Đặt lại minUser về ${algorithmConfig.minUser}`);
-    }
+  if (matchingQueue.size === 0) {
+    algorithmConfig.minUser = (await getAlgorithmConfig()).minUser;
+    console.log(`Đặt lại minUser về ${algorithmConfig.minUser}`);
   }
 };
 
