@@ -9,7 +9,10 @@ import { Server } from "socket.io";
 import http from "http";
 import { setupSocketEvents } from "./sockets";
 import socketAuthMiddleware from "./middlewares/socketAuthMiddleware";
-import { runMatchingProcess } from "./services/galeShapley/matching";
+import {
+  initializeMatchingSystem,
+  stopMatchingSystem,
+} from "./services/galeShapley/matching";
 
 dotenv.config();
 
@@ -46,28 +49,32 @@ const startServices = async () => {
   try {
     await Database.getInstance();
     await Redis.getInstance();
+    console.log("✅ Database and Redis connected successfully");
   } catch (err) {
-    console.error("Failed to connect to MongoDB or Redis:", err);
+    console.error("❌ Failed to connect to MongoDB or Redis:", err);
     // process.exit(1);
   }
 };
 
-// Chạy thuật toán ghép đôi định kỳ
-setInterval(async () => {
-  try {
-    // Chạy thuật toán ghép đôi
-    await runMatchingProcess(io);
-  } catch (error) {
-    console.error("Error running matching process:", error);
-  }
-}, 1000 * 5); // Chạy mỗi 5 seconds
-
 // Graceful shutdown
 const shutdown = async () => {
-  console.log("Shutting down server...");
-  await Redis.getInstance().then((redis) => redis.disconnect());
+  console.log("🛑 Shutting down server...");
+
+  // Stop matching system
+  stopMatchingSystem();
+
+  // Disconnect Redis
+  try {
+    const redis = await Redis.getInstance();
+    await redis.disconnect();
+    console.log("✅ Redis disconnected");
+  } catch (error) {
+    console.error("❌ Error disconnecting Redis:", error);
+  }
+
+  // Close server
   server.close(() => {
-    console.log("Server closed");
+    console.log("✅ Server closed");
     process.exit(0);
   });
 };
@@ -80,19 +87,25 @@ startServices()
   .then(() => {
     server.listen(PORT, () => {
       console.log(`⚡ Server đang chạy tại http://localhost:${PORT}`);
-      //log ipV4 address của server
+
+      // Log IPv4 address của server
       const interfaces = require("os").networkInterfaces();
       for (const interfaceName in interfaces) {
         const networkInterface = interfaces[interfaceName];
         for (const addressInfo of networkInterface) {
           if (addressInfo.family === "IPv4" && !addressInfo.internal) {
-            console.log(`IP Address: http://${addressInfo.address}:${PORT}`);
+            console.log(`🌐 IP Address: http://${addressInfo.address}:${PORT}`);
           }
         }
       }
+
+      // Khởi tạo matching system SAU KHI server đã start
+      console.log("🎯 Initializing matching system...");
+      initializeMatchingSystem(io);
+      console.log("✅ Matching system initialized successfully");
     });
   })
   .catch((err) => {
-    console.error("Failed to start server:", err);
+    console.error("❌ Failed to start server:", err);
     // process.exit(1);
   });
