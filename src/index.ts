@@ -13,13 +13,14 @@ import {
   initializeMatchingSystem,
   stopMatchingSystem,
 } from "./services/galeShapley/matching";
+import { StreamChat } from "stream-chat";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
-
+const { STREAM_API_SECRET, STREAM_API_KEY } = process.env;
 // Tạo server HTTP
 const server = http.createServer(app);
 
@@ -41,8 +42,29 @@ app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(bodyParser.json());
 app.use(cookieParser());
+const serverClient = StreamChat.getInstance(
+  STREAM_API_KEY || "",
+  STREAM_API_SECRET
+);
 
 routes(app);
+app.get("/stream-token", async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.query.userId as string;
+
+    if (!userId) {
+      res.status(400).json({ error: "Missing userId" });
+      return;
+    }
+    const token = serverClient.createToken(userId);
+    res.status(200).json({ userId, token });
+  } catch (error) {
+    res.status(500).json({
+      status: "ERR",
+      message: "Error when getting Zodiac score by ID",
+    });
+  }
+});
 
 // Kết nối database và Redis
 const startServices = async () => {
