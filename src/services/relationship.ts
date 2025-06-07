@@ -165,7 +165,7 @@ class RelationshipService {
         return { status: "none" };
       }
 
-      return { type: request.type, status: request.status };
+      return request;
     } catch (e) {
       console.log(e, "Lỗi khi kiểm tra trạng thái bạn bè");
       return "Lỗi khi kiểm tra trạng thái bạn bè";

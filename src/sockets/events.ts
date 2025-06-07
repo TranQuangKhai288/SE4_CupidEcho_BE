@@ -7,6 +7,7 @@ import {
 import Redis from "../config/redis";
 import FirebaseAdmin from "../config/firebaseAdmin";
 import { conversationService } from "../services";
+import { Relationship } from "../models";
 
 // Observer pattern imports
 import { MessageSubject } from "./observers/observer";
@@ -14,6 +15,7 @@ import { SocketMessageObserver } from "./observers/SocketMessageObserver";
 import { RedisPublishObserver } from "./observers/RedisPublishObserver";
 import { PushNotificationObserver } from "./observers/PushNotificationObserver";
 import { SocketMediator } from "./mediators/SocketMediator";
+import relationship from "../controllers/relationship";
 
 // (Bạn cần cài đặt getUserFCMToken thực tế cho hệ thống của bạn)
 async function getUserFCMToken(userId: string): Promise<string | null> {
@@ -177,11 +179,20 @@ export const setupMatchEvents = (socket: Socket, mediator: SocketMediator) => {
           if (typeof callback === "function") callback(errorResponse);
           return;
         }
-
+        //  senderId: ObjectId | string; // ID của người gửi tương tác
+        //   receiverId: ObjectId | string; // ID của người nhận tương tác
+        //   type: "friend-request" | "crush" | "block"; // Loại tương tác, bắt buộc
+        //   status: "pending" | "accepted" | "rejected" | "ignored" | "waiting"; // Trạng thái, bắt buộc
         // (Tùy chọn) Lưu match request vào DB ở đây nếu bạn muốn
-
+        const res = await Relationship.create({
+          senderId: senderId,
+          receiverId: targetUserId,
+          type: "crush",
+          status: "pending",
+        });
         // Gửi thông báo tới người nhận yêu cầu match
         await mediator.emitMatchRequest(targetUserId, {
+          relationshipId: res._id,
           senderId,
           timestamp: Date.now(),
         });
@@ -206,19 +217,31 @@ export const setupMatchEvents = (socket: Socket, mediator: SocketMediator) => {
   socket.on(
     "respondMatchRequest",
     async (
-      data: { senderId: string; response: "accept" | "reject" },
+      data: {
+        relationshipId: string;
+        senderId: string;
+        response: "accept" | "reject";
+      },
       callback?: (response: any) => void
     ) => {
       try {
         const responderId = socket.handshake.auth.userId;
-        const { senderId, response: matchResponse } = data;
-        if (!responderId || !senderId || !matchResponse) {
+        const { relationshipId, senderId, response: matchResponse } = data;
+        if (!relationshipId || !responderId || !senderId || !matchResponse) {
           const errorResponse = {
             status: "ERR",
             message: "Thiếu thông tin phản hồi",
           };
           if (typeof callback === "function") callback(errorResponse);
           return;
+        }
+        if (matchResponse === "accept") {
+          await Relationship.findByIdAndUpdate(relationshipId, {
+            status: "accepted",
+          });
+        }
+        if (matchResponse === "reject") {
+          await Relationship.findByIdAndDelete(relationshipId);
         }
 
         // (Tùy chọn) Cập nhật trạng thái match request trong DB ở đây
@@ -243,6 +266,49 @@ export const setupMatchEvents = (socket: Socket, mediator: SocketMediator) => {
           callback({
             status: "ERR",
             message: "Lỗi khi phản hồi yêu cầu match",
+          });
+      }
+    }
+  );
+
+  socket.on(
+    "exitSign",
+    async (
+      data: { convId: string; partnerId: string },
+      callback?: (response: any) => void
+    ) => {
+      try {
+        const userId = socket.handshake.auth.userId;
+        const { convId, partnerId } = data;
+        if (!userId || !convId || !partnerId) {
+          const errorResponse = {
+            status: "ERR",
+            message: "Thiếu thông tin (userId, convId, partnerId)",
+          };
+          if (typeof callback === "function") callback(errorResponse);
+          return;
+        }
+
+        // (Nếu muốn: Xử lý DB, cập nhật trạng thái, xóa conversation, v.v...)
+
+        // Gửi tín hiệu cho partner (qua socket hoặc mediator)
+        await mediator.emitExitSign(partnerId, {
+          convId,
+          userId,
+          timestamp: Date.now(),
+        });
+
+        if (typeof callback === "function")
+          callback({
+            status: "OK",
+            message: "Đã gửi tín hiệu rời khỏi cho partner",
+          });
+      } catch (error) {
+        console.error("Lỗi khi gửi exitSign:", error);
+        if (typeof callback === "function")
+          callback({
+            status: "ERR",
+            message: "Lỗi khi gửi exitSign",
           });
       }
     }

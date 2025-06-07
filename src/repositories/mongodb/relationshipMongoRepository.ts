@@ -41,19 +41,35 @@ export class RelationshipMongoRepository implements IRelationshipRepository {
     return request ? this.mapToIRelationship(request.toObject()) : null;
   }
 
-  async findByUsers(
-    senderId: string,
-    receiverId: string
-  ): Promise<IRelationship | null> {
+  async findByUsers(senderId: string, receiverId: string): Promise<any | null> {
     const request = await Relationship.findOne({
       $or: [
         { senderId: senderId, receiverId: receiverId },
         { senderId: receiverId, receiverId: senderId },
       ],
     });
-    return request ? this.mapToIRelationship(request.toObject()) : null;
-  }
 
+    if (!request) return null;
+
+    // Chuyển về object thuần
+    const relationshipObj = request.toObject();
+    console.log("relationshipObj", relationshipObj);
+    console.log("request", request);
+    // Nếu status là pending và receiverId của relationship là senderId truyền vào
+    if (
+      relationshipObj.status === "pending" &&
+      relationshipObj.receiverId.toString() === senderId.toString()
+    ) {
+      // Gắn status là 'waiting' và trả về _id
+      return {
+        ...relationshipObj,
+        status: "waiting",
+      };
+    }
+
+    // Mặc định, thêm _id nếu cần
+    return relationshipObj;
+  }
   async findAcceptedByUserId(
     userId: string,
     type: string,

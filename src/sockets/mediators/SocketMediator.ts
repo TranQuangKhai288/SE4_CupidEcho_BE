@@ -81,5 +81,15 @@ export class SocketMediator {
 
     this.io.to(targetSocketId).emit("matchRequestResponse", payload);
   }
+
+  async emitExitSign(userId: string, payload: any) {
+    const targetSocketId = await this.redisClient.get(`socket:${userId}`);
+
+    // Giả sử bạn map userId => socketId ở đâu đó, VD: this.userSockets[userId]
+
+    if (targetSocketId && this.io) {
+      this.io.to(targetSocketId).emit("exitSignal", payload);
+    }
+  }
   // Có thể mở rộng các hành động khác (emit message, broadcast, push notification, ...)
 }
