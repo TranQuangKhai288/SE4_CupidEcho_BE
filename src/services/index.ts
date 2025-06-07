@@ -15,6 +15,7 @@ import {
   messageMongoRepository,
   postMongoRepository,
 } from "../repositories/mongodb";
+// Facade Pattern
 
 const userServices = new UserService(
   UserMongoRepository,

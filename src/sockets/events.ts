@@ -8,15 +8,28 @@ import Redis from "../config/redis";
 import FirebaseAdmin from "../config/firebaseAdmin";
 import { conversationService } from "../services";
 
+// Observer pattern imports
+import { MessageSubject } from "./observers/observer";
+import { SocketMessageObserver } from "./observers/SocketMessageObserver";
+import { RedisPublishObserver } from "./observers/RedisPublishObserver";
+import { PushNotificationObserver } from "./observers/PushNotificationObserver";
+import { SocketMediator } from "./mediators/SocketMediator";
+
+// (Bạn cần cài đặt getUserFCMToken thực tế cho hệ thống của bạn)
+async function getUserFCMToken(userId: string): Promise<string | null> {
+  // Ví dụ: Lấy từ MongoDB, bạn cần thêm collection để lưu token
+  // const user = await userRepository.findById(userId);
+  // return user?.fcmToken || null;
+  return null; // Thay bằng logic thực tế
+}
+
 const messageService = new MessageService(
   messageMongoRepository,
   conversationMongoRepository
 );
 const firebaseApp = FirebaseAdmin.initialize();
 
-export const setupConvEvents = (socket: Socket) => {
-  // Bỏ sự kiện joinConversation vì server tự quản lý
-
+export const setupConvEvents = (socket: Socket, mediator: SocketMediator) => {
   socket.on(
     "createMessage",
     async (
@@ -26,9 +39,6 @@ export const setupConvEvents = (socket: Socket) => {
       try {
         const userId = socket.handshake.auth.userId;
         const { convId, content } = data;
-        console.log(data, "data");
-        console.log(userId, "userId");
-
         if (!userId || !convId || !content) {
           const errorResponse = {
             status: "ERR",
@@ -45,8 +55,6 @@ export const setupConvEvents = (socket: Socket) => {
           userId,
           content
         );
-        console.log(response, "response");
-
         if (typeof response === "string" || !response) {
           const errorResponse = {
             status: "ERR",
@@ -57,15 +65,7 @@ export const setupConvEvents = (socket: Socket) => {
           return;
         }
 
-        // Lấy instance Redis
-        const redis = await Redis.getInstance();
-        const redisPub = redis.getPubClient();
-        const redisClient = redis.getClient();
-
-        // Publish tin nhắn tới channel
-        await redisPub.publish(convId, JSON.stringify(response));
-
-        // Gửi Push Notification cho người offline
+        // Lấy thông tin participant
         const conversation = await conversationMongoRepository.findById(convId);
         if (!conversation) {
           const errorResponse = {
@@ -77,35 +77,26 @@ export const setupConvEvents = (socket: Socket) => {
           return;
         }
         const participantIds = conversation.participants;
-        for (const participantId of participantIds) {
-          const socketId = await redisClient.get(`socket:${participantId}`);
-          if (socketId) {
-            console.log(
-              `Người dùng ${participantId} đang online (socketId: ${socketId})`
-            );
-            socket.to(socketId).emit("newMessage", response);
-            console.log("Gửi tin nhắn real-time...");
-          } else {
-            console.log(`Người dùng ${participantId} đang offline`);
-            console.log("Gửi Push Notification...");
-            if (firebaseApp) {
-              const token = await getUserFCMToken(participantId);
-              if (token) {
-                await firebaseApp.messaging().send({
-                  token,
-                  notification: {
-                    title: "Tin nhắn mới",
-                    body: `${content.substring(0, 50)}...`,
-                  },
-                  data: { convId },
-                });
-                console.log(
-                  `Đã gửi Push Notification tới ${participantId} với token ${token}`
-                );
-              } else {
-                console.log(`Không tìm thấy FCM token cho ${participantId}`);
-              }
-            }
+
+        // Observer pattern vẫn có thể dùng (hoặc dùng mediator trực tiếp)
+        const redis = await Redis.getInstance();
+        const redisPub = redis.getPubClient();
+        const redisClient = redis.getClient();
+
+        const subject = new MessageSubject();
+        subject.addObserver(new SocketMessageObserver(socket));
+        subject.addObserver(new RedisPublishObserver(redisPub, convId));
+        subject.addObserver(new PushNotificationObserver(firebaseApp));
+        await subject.notifyAll(response, {
+          participantIds,
+          redisClient,
+          getUserFCMToken,
+        });
+
+        // Ngoài ra có thể dùng mediator để broadcast tới các participant
+        for (const pid of participantIds) {
+          if (pid !== userId) {
+            // await mediator.emitMessage(pid, response);
           }
         }
 
@@ -126,77 +117,16 @@ export const setupConvEvents = (socket: Socket) => {
       }
     }
   );
-
-  socket.on(
-    "exitSign",
-    async (
-      data: { convId: string; partnerId: string },
-      callback?: (response: any) => void
-    ) => {
-      try {
-        const userId = socket.handshake.auth.userId;
-        const { convId, partnerId } = data;
-
-        if (!userId || !convId) {
-          const errorResponse = {
-            status: "ERR",
-            message: "Thiếu thông tin cần thiết (userId, convId)",
-          };
-          socket.emit("errorMessage", errorResponse);
-          if (typeof callback === "function") callback(errorResponse);
-          return;
-        }
-
-        // Xóa doan chat
-        const response = await conversationService.deleteConversation(
-          convId,
-          userId
-        );
-        console.log(response, "response deleteConversation");
-        if (typeof response === "string" || !response) {
-          // const errorResponse = {
-          //   status: "ERR",
-          //   message: "Lỗi khi thoát cuộc trò chuyện",
-          // };
-          // socket.emit("errorMessage", errorResponse);
-          // if (typeof callback === "function") callback(errorResponse);
-          return;
-        }
-        // lấy socketId của người dùng
-        const redis = await Redis.getInstance();
-        const redisClient = redis.getClient();
-        const socketId = await redisClient.get(`socket:${partnerId}`);
-        console.log();
-        if (socketId) {
-          socket.to(socketId).emit("exitSignal", convId);
-        } else {
-          console.error("Socket ID is null, cannot emit 'exitSign'");
-        }
-        const successResponse = {
-          status: "OK",
-          message: "Đã thoát khỏi cuộc trò chuyện",
-          data: response,
-        };
-        if (typeof callback === "function") callback(successResponse);
-      } catch (error) {
-        console.error("Lỗi khi thoát cuộc trò chuyện:", error);
-        const errorResponse = {
-          status: "ERR",
-          message: "Lỗi khi thoát cuộc trò chuyện",
-        };
-        socket.emit("errorMessage", errorResponse);
-        if (typeof callback === "function") callback(errorResponse);
-      }
-    }
-  );
 };
 
-export const setupNotificationEvents = (socket: Socket) => {
+export const setupNotificationEvents = (
+  socket: Socket,
+  mediator: SocketMediator
+) => {
   socket.on("sendNotification", async (data, callback) => {
     try {
       const { recipientId, type, content } = data;
       const senderId = socket.handshake.auth.userId;
-
       if (!recipientId || !type || !content) {
         const errorResponse = {
           status: "ERR",
@@ -205,40 +135,14 @@ export const setupNotificationEvents = (socket: Socket) => {
         if (typeof callback === "function") callback(errorResponse);
         return;
       }
-
-      // Lấy instance Redis
-      const redis = await Redis.getInstance();
-      const redisClient = redis.getClient();
-
-      // Gửi thông báo real-time nếu người nhận online
-      const recipientSocketId = await redisClient.get(`socket:${recipientId}`);
-      if (recipientSocketId) {
-        console.log(
-          `Người dùng ${recipientId} đang offline, gửi thông báo real-time`
-        );
-        socket.to(recipientSocketId).emit("newNotification", {
-          senderId,
-          type,
-          content,
-          timestamp: Date.now(),
-        });
-      } else if (firebaseApp) {
-        // Gửi Push Notification nếu offline
-        console.log(`Người dùng ${recipientId} đang offline`);
-        console.log("Gửi Push Notification...");
-        const token = await getUserFCMToken(recipientId);
-        if (token) {
-          await firebaseApp.messaging().send({
-            token,
-            notification: {
-              title: "Thông báo mới",
-              body: content.substring(0, 50),
-            },
-            data: { type },
-          });
-        }
-      }
-
+      // Gửi notification qua mediator
+      await mediator.emitNotification(recipientId, {
+        senderId,
+        type,
+        content,
+        timestamp: Date.now(),
+      });
+      // (Push Notification cũng có thể dùng observer như trước)
       const successResponse = {
         status: "OK",
         message: "Thông báo đã được gửi",
@@ -251,11 +155,3 @@ export const setupNotificationEvents = (socket: Socket) => {
     }
   });
 };
-
-// Hàm lấy FCM token (cần triển khai)
-async function getUserFCMToken(userId: string): Promise<string | null> {
-  // Ví dụ: Lấy từ MongoDB, bạn cần thêm collection để lưu token
-  // const user = await userRepository.findById(userId);
-  // return user?.fcmToken || null;
-  return null; // Thay bằng logic thực tế
-}
