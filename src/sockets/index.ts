@@ -1,6 +1,10 @@
 import { Server, Socket } from "socket.io";
 import Redis from "../config/redis";
-import { setupConvEvents, setupNotificationEvents } from "./events";
+import {
+  setupConvEvents,
+  setupMatchEvents,
+  setupNotificationEvents,
+} from "./events";
 import { SocketMediator } from "./mediators/SocketMediator";
 
 export const setupSocketEvents = (io: Server) => {
@@ -30,7 +34,7 @@ export const setupSocketEvents = (io: Server) => {
       // Truyền mediator vào các event handler
       setupConvEvents(socket, mediator);
       setupNotificationEvents(socket, mediator);
-
+      setupMatchEvents(socket, mediator);
       socket.on("webrtc:signal", async (signal) => {
         const { to } = signal;
         if (to) {

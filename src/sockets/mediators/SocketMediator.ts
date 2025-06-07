@@ -69,6 +69,17 @@ export class SocketMediator {
       this.io.to(targetSocketId).emit("newNotification", data);
     }
   }
+  async emitMatchRequest(userId: string, payload: any) {
+    // emit tới socket của userId, ví dụ:
+    const targetSocketId = await this.redisClient.get(`socket:${userId}`);
 
+    this.io.to(targetSocketId).emit("receiveMatchRequest", payload);
+  }
+
+  async emitMatchRequestResponse(userId: string, payload: any) {
+    const targetSocketId = await this.redisClient.get(`socket:${userId}`);
+
+    this.io.to(targetSocketId).emit("matchRequestResponse", payload);
+  }
   // Có thể mở rộng các hành động khác (emit message, broadcast, push notification, ...)
 }

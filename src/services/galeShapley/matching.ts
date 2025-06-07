@@ -1,6 +1,6 @@
 // matching.ts - Updated version
 import mongoose from "mongoose";
-import { Profile, UserCondition } from "../../models";
+import { Profile, UserCondition, User } from "../../models";
 import { runStableMatching } from "./matchingAlgorithm";
 import Redis from "../../config/redis";
 import { conversationService } from "../../services";
@@ -346,10 +346,17 @@ const processBatch = async (batch: string[], io: any) => {
         const client = redis.getClient();
         const socketIdA = await client.get(`socket:${idA}`);
         const socketIdB = await client.get(`socket:${idB}`);
-
+        const userA = await User.findById(idA);
+        const userB = await User.findById(idB);
+        console.log(userA, "userA");
+        console.log(userB, "userB");
         if (socketIdA) {
           io.to(socketIdA).emit("matching:matched", {
-            partnerId: idB,
+            partner: {
+              id: idB,
+              name: userB?.name,
+              avatar: userB?.avatar,
+            },
             timestamp: new Date(),
             conversationId,
           });
@@ -357,7 +364,11 @@ const processBatch = async (batch: string[], io: any) => {
 
         if (socketIdB) {
           io.to(socketIdB).emit("matching:matched", {
-            partnerId: idA,
+            partner: {
+              id: idA,
+              name: userA?.name,
+              avatar: userA?.avatar,
+            },
             timestamp: new Date(),
             conversationId,
           });

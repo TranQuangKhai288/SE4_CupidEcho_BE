@@ -155,3 +155,96 @@ export const setupNotificationEvents = (
     }
   });
 };
+
+// Bạn có thể dùng database để lưu trạng thái match request nếu cần
+
+export const setupMatchEvents = (socket: Socket, mediator: SocketMediator) => {
+  // Khi người dùng gửi yêu cầu match tới ai đó
+  socket.on(
+    "sendMatchRequest",
+    async (
+      data: { targetUserId: string },
+      callback?: (response: any) => void
+    ) => {
+      try {
+        const senderId = socket.handshake.auth.userId;
+        const { targetUserId } = data;
+        if (!senderId || !targetUserId) {
+          const errorResponse = {
+            status: "ERR",
+            message: "Thiếu thông tin người gửi hoặc người nhận",
+          };
+          if (typeof callback === "function") callback(errorResponse);
+          return;
+        }
+
+        // (Tùy chọn) Lưu match request vào DB ở đây nếu bạn muốn
+
+        // Gửi thông báo tới người nhận yêu cầu match
+        await mediator.emitMatchRequest(targetUserId, {
+          senderId,
+          timestamp: Date.now(),
+        });
+
+        if (typeof callback === "function")
+          callback({
+            status: "OK",
+            message: "Đã gửi yêu cầu match",
+          });
+      } catch (error) {
+        console.error("Lỗi khi gửi yêu cầu match:", error);
+        if (typeof callback === "function")
+          callback({
+            status: "ERR",
+            message: "Lỗi khi gửi yêu cầu match",
+          });
+      }
+    }
+  );
+
+  // Khi người nhận phản hồi lại yêu cầu match (accept hoặc reject)
+  socket.on(
+    "respondMatchRequest",
+    async (
+      data: { senderId: string; response: "accept" | "reject" },
+      callback?: (response: any) => void
+    ) => {
+      try {
+        const responderId = socket.handshake.auth.userId;
+        const { senderId, response: matchResponse } = data;
+        if (!responderId || !senderId || !matchResponse) {
+          const errorResponse = {
+            status: "ERR",
+            message: "Thiếu thông tin phản hồi",
+          };
+          if (typeof callback === "function") callback(errorResponse);
+          return;
+        }
+
+        // (Tùy chọn) Cập nhật trạng thái match request trong DB ở đây
+
+        // Gửi phản hồi về cho sender
+        await mediator.emitMatchRequestResponse(senderId, {
+          responderId,
+          response: matchResponse,
+          timestamp: Date.now(),
+        });
+
+        if (typeof callback === "function")
+          callback({
+            status: "OK",
+            message: `Bạn đã ${
+              matchResponse === "accept" ? "chấp nhận" : "từ chối"
+            } yêu cầu match`,
+          });
+      } catch (error) {
+        console.error("Lỗi khi phản hồi yêu cầu match:", error);
+        if (typeof callback === "function")
+          callback({
+            status: "ERR",
+            message: "Lỗi khi phản hồi yêu cầu match",
+          });
+      }
+    }
+  );
+};
