@@ -9,7 +9,6 @@ const userSchema = new Schema<IUserDocument>(
     password: { type: String, required: true },
     avatar: { type: String },
     phone: { type: String },
-    bio: { type: String },
     isAdmin: { type: Boolean, required: true, default: false },
     fcmToken: { type: String, default: null }, // Lưu FCM Token
     createdAt: { type: Date, default: Date.now },

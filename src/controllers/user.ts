@@ -90,6 +90,7 @@ const getDetailsUser = async (req: Request, res: Response): Promise<void> => {
       message: "Get user profile successfully",
       data: response,
     } as IApiResponse<IUser>);
+    console.log(response, "response Get user profile ");
     console.log("Get user profile successfully");
   } catch (error) {
     res.status(500).json({

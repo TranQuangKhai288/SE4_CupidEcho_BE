@@ -280,12 +280,12 @@ const seedDemoUsers = async () => {
   try {
     console.log("🌱 Starting demo database seeding (12 users)...");
 
-    // Clear existing data
-    console.log("🧹 Clearing existing data...");
-    await User.deleteMany({});
-    await Profile.deleteMany({});
-    await UserCondition.deleteMany({});
-    await Relationship.deleteMany({});
+    // // Clear existing data
+    // console.log("🧹 Clearing existing data...");
+    // await User.deleteMany({});
+    // await Profile.deleteMany({});
+    // await UserCondition.deleteMany({});
+    // await Relationship.deleteMany({});
 
     // Get existing interests
     console.log("📋 Fetching existing interests...");
@@ -340,6 +340,7 @@ const seedDemoUsers = async () => {
           type: "Point",
           coordinates: userData.location.coords,
         },
+        bio: "",
         interests: userInterestIds,
         birthDate: userData.birthDate,
         zodiac: userData.zodiac,

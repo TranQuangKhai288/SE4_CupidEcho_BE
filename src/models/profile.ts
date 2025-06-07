@@ -19,6 +19,8 @@ const profileSchema = new Schema<IProfileDocument>(
       required: true,
       enum: ["male", "female", "another"],
     },
+    bio: { type: String, default: "" },
+
     address: {
       formattedAddress: { type: String },
       city: { type: String },

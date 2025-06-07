@@ -279,12 +279,12 @@ const seedDatabase = async () => {
   try {
     console.log("🌱 Starting database seeding...");
 
-    // Clear existing data
-    console.log("🧹 Clearing existing data...");
-    await User.deleteMany({});
-    await Profile.deleteMany({});
-    await UserCondition.deleteMany({});
-    await Relationship.deleteMany({});
+    // // Clear existing data
+    // console.log("🧹 Clearing existing data...");
+    // await User.deleteMany({});
+    // await Profile.deleteMany({});
+    // await UserCondition.deleteMany({});
+    // await Relationship.deleteMany({});
 
     // Get existing interests
     console.log("📋 Fetching existing interests...");
@@ -349,6 +349,7 @@ const seedDatabase = async () => {
             location.coords[1] + (Math.random() - 0.5) * 0.01,
           ],
         },
+        bio: "",
         interests: userInterests.map((interest) => interest._id),
         birthDate,
         zodiac: getRandomElement(zodiacs),

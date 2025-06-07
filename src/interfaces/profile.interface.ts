@@ -12,6 +12,7 @@ export interface IProfile {
     type: string;
     coordinates: number[];
   };
+  bio?: string;
   interests: string[];
   birthDate: Date | undefined;
   zodiac: string;
