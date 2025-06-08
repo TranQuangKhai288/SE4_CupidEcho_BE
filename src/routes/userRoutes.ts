@@ -21,8 +21,10 @@ router.post("/register", auth.createUser);
 router.post("/login", auth.loginUser);
 // router.post("/log-out", UserController.logoutUser);
 router.post("/refresh-token", UserController.refreshToken);
-router.post("/forgot-password", UserController.updateUser);
-// router.get("/verify-email", auth.verifyEmail);
+router.post("/forgot-password", UserController.forgotPassword);
+router.get("/verify-email", auth.verifiedEmail);
+router.post("/verify-otp", auth.verifiedOTP);
+router.post("/reset-password", auth.resetPassword);
 
 // User routes
 router

@@ -7,6 +7,10 @@ import {
 } from "../repositories/interfaces";
 import bcrypt from "bcrypt";
 import { genneralAccessToken, genneralRefreshToken } from "./JWTService";
+import { sendVerificationEmail } from "./emailService"; // Bạn cần tự tạo
+import jwt from "jsonwebtoken";
+import dotenv from "dotenv";
+dotenv.config();
 
 class UserService {
   constructor(
@@ -25,7 +29,7 @@ class UserService {
     }
   }
 
-  async createUser(newUser: ICreateUser): Promise<any> {
+  async verifyEmail(newUser: ICreateUser): Promise<any> {
     const { name, email, password } = newUser;
     try {
       const existingUser = await this.userRepository.findByEmail(email);
@@ -33,46 +37,68 @@ class UserService {
         return "Email đã tồn tại";
       }
 
-      const hash = bcrypt.hashSync(password, 10);
-      const defaultAvatar =
-        "https://cdn-icons-png.freepik.com/512/8742/8742495.png";
+      // Tạo token xác minh (có thể dùng JWT hoặc chuỗi ngẫu nhiên)
+      const token = jwt.sign(
+        { email, name, password },
+        process.env.EMAIL_SECRET!,
+        {
+          expiresIn: "15m",
+        }
+      );
 
-      const createdUser = await this.userRepository.create({
-        name,
-        email,
-        password: hash,
-        avatar: defaultAvatar,
-        isAdmin: false,
-      } as ICreateUser);
+      // Gửi email xác minh
+      const verificationLink = `http://localhost:${process.env.PORT}/api/user/verify-email?token=${token}`;
+      await sendVerificationEmail(email, verificationLink);
 
-      await this.profileRepository.create({
-        userId: createdUser._id,
-        gender: "another",
-        location: {
-          type: "Point",
-          coordinates: [0, 0],
-        },
-        interests: [],
-        birthDate: new Date(),
-        zodiac: "Unknown",
-      });
-
-      await this.conditionRepository.create({
-        userId: createdUser._id,
-        desired_gender: "another",
-        max_distance_km: 10,
-        interest_weight: 3,
-        distance_weight: 3,
-        zodiac_weight: 2,
-        age_weight: 2,
-        max_age_difference: 2,
-      });
-
-      return createdUser;
+      return {
+        status: "OK",
+        message: "Verification email has been sent. Please check your inbox.",
+      };
     } catch (e) {
       console.log(e, "Lỗi khi tạo người dùng");
       return "Lỗi khi tạo người dùng";
     }
+  }
+
+  async createUser(newUser: any): Promise<any> {
+    const { name, email, password } = newUser;
+    console.log("name, email, password", name, email, password);
+    const hash = bcrypt.hashSync(password, 10);
+    const defaultAvatar =
+      "https://cdn-icons-png.freepik.com/512/8742/8742495.png";
+
+    const createdUser = await this.userRepository.create({
+      name,
+      email,
+      password: hash,
+      avatar: defaultAvatar,
+      isAdmin: false,
+    } as ICreateUser);
+
+    await this.profileRepository.create({
+      userId: createdUser._id,
+      gender: "another",
+      location: {
+        type: "Point",
+        coordinates: [0, 0],
+      },
+      interests: [],
+      birthDate: new Date(),
+      zodiac: "Unknown",
+    });
+
+    await this.conditionRepository.create({
+      userId: createdUser._id,
+      desired_gender: "another",
+      max_distance_km: 10,
+      interest_weight: 3,
+      distance_weight: 3,
+      zodiac_weight: 2,
+      age_weight: 2,
+      max_age_difference: 2,
+    });
+
+    return createdUser;
   }
 
   async loginUser({

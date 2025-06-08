@@ -4,6 +4,12 @@ import { IUser } from "../interfaces/user.interface";
 import { IApiResponse } from "../interfaces/response.interface";
 // import { sendEmail } from "../services/emailService";
 import * as crypto from "crypto";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+import dotenv from "dotenv";
+import { User } from "../models";
+import Redis from "../config/redis";
+dotenv.config();
 
 // Bộ nhớ tạm thời cho token xác nhận (nên thay bằng Redis hoặc DB)
 const emailVerificationTokens: { [key: string]: string } = {};
@@ -50,20 +56,19 @@ const createUser = async (req: Request, res: Response): Promise<void> => {
 
     // Tạo user
 
-    const createdUser = await userServices.createUser(req.body);
-    if (typeof createdUser === "string") {
+    const verifyEmail = await userServices.verifyEmail(req.body);
+    if (typeof verifyEmail === "string") {
       res.status(400).json({
         status: "ERR",
-        message: createdUser,
+        message: verifyEmail,
       } as IApiResponse<null>);
       return;
     }
     res.status(201).json({
       status: "OK",
-      message: "User created successfully",
-      data: createdUser,
-    } as unknown as IApiResponse<IUser>);
-    console.log("User created successfully");
+      message: verifyEmail.message,
+    } as unknown as IApiResponse<any>);
+    console.log("Mailed");
   } catch (error) {
     res.status(500).json({
       status: "ERR",
@@ -72,43 +77,30 @@ const createUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
-// const verifyEmail = async (req: Request, res: Response): Promise<void> => {
-//   try {
-//     const { token, name, email, password, gender } = req.query as {
-//       [key: string]: string;
-//     };
+const verifiedEmail = async (req: Request, res: Response) => {
+  const { token } = req.query;
+  try {
+    const decoded: any = jwt.verify(token as string, process.env.EMAIL_SECRET!);
 
-//     // Kiểm tra token
-//     if (
-//       !emailVerificationTokens[email] ||
-//       emailVerificationTokens[email] !== token
-//     ) {
-//       res.status(400).json({
-//         status: "ERR",
-//         message: "Invalid or expired verification token",
-//       } as IApiResponse<null>);
-//       return;
-//     }
+    const { name, email, password } = decoded;
+    const createdUser = await userServices.createUser({
+      name,
+      email,
+      password,
+    });
 
-//     // Token hợp lệ => Xóa token
-//     delete emailVerificationTokens[email];
-
-//     // Tạo user
-//     const user: IUser = { name, email, password };
-//     const createdUser = await userServices.createUser(user);
-
-//     res.status(201).json({
-//       status: "OK",
-//       message: "Email verified and user created successfully",
-//       data: createdUser,
-//     } as unknown as IApiResponse<IUser>);
-//   } catch (error) {
-//     res.status(500).json({
-//       status: "ERR",
-//       message: "An error occurred during email verification",
-//     } as IApiResponse<null>);
-//   }
-// };
+    res.status(200).json({
+      status: "OK",
+      message: "Xác minh email thành công, tài khoản đã được tạo.",
+      data: createdUser,
+    });
+    return;
+  } catch (err) {
+    console.error("Token hết hạn hoặc không hợp lệ", err);
+    res.status(400).json({ message: "Token không hợp lệ hoặc đã hết hạn" });
+    return;
+  }
+};
 
 const loginUser = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -164,8 +156,61 @@ const loginUser = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+const verifiedOTP = async (req: Request, res: Response) => {
+  try {
+    console.log("verifiedOTP");
+    const redis = await Redis.getInstance();
+    const { email, otp } = req.body;
+    const savedOTP = await redis.getClient().get(`otp:${email}`);
+    console.log(savedOTP, "savedOTP");
+    console.log(otp, "otp");
+    if (savedOTP === otp) {
+      await redis.getClient().del(`otp:${email}`);
+
+      res.status(200).json({
+        status: "OK",
+        message: "OTP verified. You can reset your password now.",
+      });
+      return;
+    } else {
+      res.status(400).json({
+        status: "ERR",
+        message: "OTP unverified. Let check your gmail again",
+      });
+      return;
+    }
+  } catch (err) {
+    res.status(400).json({ status: "ERR", message: "Invalid or expired OTP" });
+
+    return;
+  }
+};
+
+const resetPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, newPassword } = req.body;
+    const hash = bcrypt.hashSync(newPassword, 10);
+    const user = await User.findOneAndUpdate(
+      { email: email },
+      {
+        password: hash,
+      }
+    );
+    console.log(user, "updatepass");
+
+    res.json({ status: "OK", message: "Password reset successfully!" });
+    return;
+  } catch (err) {
+    res.status(400).json({ status: "ERR", message: "Invalid or expired OTP" });
+
+    return;
+  }
+};
+
 export default {
   createUser,
   loginUser,
-  // verifyEmail,
+  verifiedEmail,
+  verifiedOTP,
+  resetPassword,
 };

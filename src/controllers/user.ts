@@ -1,10 +1,13 @@
 import { Request, Response } from "express";
+import Redis from "../config/redis"; // Đường dẫn tới file config Redis của bạn
 
 import { userServices } from "../services";
 import { IUser } from "../interfaces/user.interface";
 import { IApiResponse } from "../interfaces/response.interface";
 import { refreshAccessToken } from "../services/JWTService";
-
+import { User } from "../models";
+import { sendVerificationEmailByOTP } from "../services/emailService"; // file của bạn
+const OTP_EXPIRE_SECONDS = 5 * 60; // 5 phút
 const updateUser = async (req: Request, res: Response): Promise<void> => {
   try {
     if (!req.user?._id) {
@@ -201,6 +204,32 @@ const refreshToken = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      res.status(404).json({ message: "Email not found" });
+      return;
+    }
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    const redis = await Redis.getInstance();
+    // Lưu OTP với key là email, value là otp, hết hạn sau 5 phút
+    await redis.getClient().set(`otp:${email}`, otp, {
+      EX: OTP_EXPIRE_SECONDS,
+    });
+    await sendVerificationEmailByOTP(email, otp);
+    res.json({ status: "OK", message: "OTP sent to email" });
+    return;
+  } catch (error) {
+    console.log(error, "Error when refreshing token");
+    res.status(500).json({
+      status: "ERR",
+      message: "An error occurred while refreshing token",
+    } as IApiResponse<null>);
+  }
+};
+
 export default {
   updateUser,
   deleteUser,
@@ -208,4 +237,5 @@ export default {
   getUsers,
   getRecommendUsers,
   refreshToken,
+  forgotPassword,
 };
